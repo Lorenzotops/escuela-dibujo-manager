@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USUARIOS ────────────────────────────────────────────────────────────────
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("profesor")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── CONFIGURACIÓN DE LA ESCUELA ─────────────────────────────────────────────
+model Settings {
+  id              Int     @id @default(autoincrement())
+  schoolName      String  @default("Escuela de Dibujo")
+  address         String  @default("")
+  phone           String  @default("")
+  email           String  @default("")
+  cifNif          String  @default("")
+  monthlyFee      Float   @default(50.0)
+  invoicePrefix   String  @default("FAC")
+  invoiceCounter  Int     @default(1)
+  logoUrl         String  @default("")
+  invoiceFooter   String  @default("Gracias por confiar en nosotros.")
+}
+
+// ─── GRUPOS / HORARIOS ────────────────────────────────────────────────────────
+model Group {
+  id            Int            @id @default(autoincrement())
+  name          String
+  dayOfWeek     String
+  startTime     String
+  endTime       String
+  teacher       String
+  maxCapacity   Int            @default(15)
+  notes         String         @default("")
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  studentGroups StudentGroup[]
+  attendance    Attendance[]
+}
+
+// ─── ALUMNOS ──────────────────────────────────────────────────────────────────
+model Student {
+  id                Int            @id @default(autoincrement())
+  fullName          String
+  birthDate         DateTime
+  dni               String         @default("")
+  address           String         @default("")
+  school            String         @default("")
+  howFoundUs        String         @default("")
+  referredBy        String         @default("")
+  enrollmentReason  String         @default("")
+  enrollmentDate    DateTime       @default(now())
+  status            String         @default("activo")
+  currentGroupId    Int?
+  notes             String         @default("")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  guardians             Guardian[]
+  studentGroups         StudentGroup[]
+  payments              Payment[]
+  invoices              Invoice[]
+  attendance            Attendance[]
+  absenceNotifications  AbsenceNotification[]
+  withdrawal            Withdrawal?
+}
+
+// ─── TUTORES / PADRES ─────────────────────────────────────────────────────────
+model Guardian {
+  id           Int      @id @default(autoincrement())
+  studentId    Int
+  fullName     String
+  dni          String   @default("")
+  phone        String
+  email        String   @default("")
+  address      String   @default("")
+  relationship String   @default("madre")
+  notes        String   @default("")
+  isPrimary    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+// ─── HISTORIAL ALUMNO ↔ GRUPO ─────────────────────────────────────────────────
+model StudentGroup {
+  id         Int       @id @default(autoincrement())
+  studentId  Int
+  groupId    Int
+  assignedAt DateTime  @default(now())
+  leftAt     DateTime?
+  isCurrent  Boolean   @default(true)
+  notes      String    @default("")
+
+  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  group      Group     @relation(fields: [groupId], references: [id])
+}
+
+// ─── PAGOS ────────────────────────────────────────────────────────────────────
+model Payment {
+  id        Int       @id @default(autoincrement())
+  studentId Int
+  month     Int
+  year      Int
+  amount    Float
+  paidAt    DateTime?
+  method    String    @default("efectivo")
+  status    String    @default("pendiente")
+  notes     String    @default("")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  invoice   Invoice?
+}
+
+// ─── FACTURAS ─────────────────────────────────────────────────────────────────
+model Invoice {
+  id            Int       @id @default(autoincrement())
+  invoiceNumber String    @unique
+  studentId     Int
+  paymentId     Int?      @unique
+  concept       String    @default("Cuota mensual Escuela de Dibujo")
+  billedMonth   Int
+  billedYear    Int
+  amount        Float
+  issueDate     DateTime  @default(now())
+  status        String    @default("emitida")
+  notes         String    @default("")
+  guardianName  String    @default("")
+  guardianDni   String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payment       Payment?  @relation(fields: [paymentId], references: [id])
+}
+
+// ─── ASISTENCIA ───────────────────────────────────────────────────────────────
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  groupId   Int
+  date      DateTime
+  status    String
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id])
+
+  @@unique([studentId, date])
+}
+
+// ─── AVISOS DE AUSENCIA ───────────────────────────────────────────────────────
+model AbsenceNotification {
+  id         Int      @id @default(autoincrement())
+  studentId  Int
+  date       DateTime
+  reason     String   @default("")
+  notifiedAt DateTime @default(now())
+
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+// ─── BAJAS ────────────────────────────────────────────────────────────────────
+model Withdrawal {
+  id             Int       @id @default(autoincrement())
+  studentId      Int       @unique
+  withdrawalDate DateTime
+  reason         String
+  notes          String    @default("")
+  contactLater   Boolean   @default(false)
+  reactivatedAt  DateTime?
+  createdAt      DateTime  @default(now())
+
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+// ─── PLANTILLAS DE MENSAJES ───────────────────────────────────────────────────
+model MessageTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  body      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
