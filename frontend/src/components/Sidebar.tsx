@@ -7,17 +7,38 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const navItems = [
-  { to: '/',            label: 'Dashboard',       icon: '📊', end: true },
-  { to: '/alumnos',     label: 'Alumnos',          icon: '🎓' },
-  { to: '/pagos',       label: 'Pagos',            icon: '💰' },
-  { to: '/facturas',    label: 'Facturación',      icon: '🧾' },
-  { to: '/asistencia',  label: 'Asistencia',       icon: '✅' },
-  { to: '/grupos',      label: 'Grupos',           icon: '👥' },
-  { to: '/bajas',       label: 'Bajas',            icon: '📤', adminOnly: true },
-  { to: '/estadisticas',label: 'Estadísticas',     icon: '📈' },
-  { to: '/configuracion',label:'Configuración',    icon: '⚙️',  adminOnly: true },
-  { to: '/usuarios',    label: 'Usuarios',         icon: '👤', adminOnly: true },
+const navSections = [
+  {
+    label: 'Principal',
+    items: [
+      { to: '/',            label: 'Dashboard',    icon: '⬡',  end: true },
+      { to: '/alumnos',     label: 'Alumnos',      icon: '🎓' },
+      { to: '/grupos',      label: 'Grupos',       icon: '👥' },
+    ],
+  },
+  {
+    label: 'Gestión',
+    items: [
+      { to: '/asistencia',  label: 'Asistencia',   icon: '✓' },
+      { to: '/pagos',       label: 'Pagos',        icon: '◈' },
+      { to: '/facturas',    label: 'Facturación',  icon: '◻' },
+    ],
+  },
+  {
+    label: 'Análisis',
+    items: [
+      { to: '/estadisticas',label: 'Estadísticas', icon: '▲' },
+      { to: '/bajas',       label: 'Bajas',        icon: '↗', adminOnly: true },
+    ],
+  },
+  {
+    label: 'Sistema',
+    adminOnly: true,
+    items: [
+      { to: '/configuracion',label:'Configuración', icon: '◎', adminOnly: true },
+      { to: '/usuarios',    label: 'Usuarios',     icon: '◯', adminOnly: true },
+    ],
+  },
 ];
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
@@ -29,75 +50,221 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     navigate('/login');
   };
 
+  const visibleSections = navSections.filter(s => !s.adminOnly || isAdmin);
+
   return (
-    <aside
-      className={`
-        fixed lg:static inset-y-0 left-0 z-30
-        w-64 bg-white border-r border-gray-200
-        flex flex-col
-        transform transition-transform duration-300 ease-in-out
-        ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}
-    >
-      {/* Logo */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center text-white text-xl">
-            🎨
-          </div>
-          <div>
-            <p className="font-bold text-gray-900 text-sm leading-tight">Escuela de Dibujo</p>
-            <p className="text-xs text-gray-500">Manager</p>
+    <>
+      {/* Overlay móvil */}
+      {open && (
+        <div
+          className="fixed inset-0 z-20 lg:hidden"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        style={{
+          width: '220px',
+          minWidth: '220px',
+          background: '#0f0f0f',
+          borderRight: '1px solid #1e1e1e',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          zIndex: 30,
+          transform: open ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+        className="lg:static lg:translate-x-0"
+      >
+        {/* ── Logo ── */}
+        <div style={{
+          padding: '20px 16px 16px',
+          borderBottom: '1px solid #1a1a1a',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              boxShadow: '0 2px 8px rgba(124,58,237,0.4)',
+              flexShrink: 0,
+            }}>
+              🎨
+            </div>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: '13px', color: '#f0f0f0', lineHeight: 1.2 }}>
+                Arte y Color
+              </p>
+              <p style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>Manager</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <ul className="space-y-1">
-          {navItems.map(item => {
-            if (item.adminOnly && !isAdmin) return null;
+        {/* ── Navigation ── */}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 8px' }}>
+          {visibleSections.map((section) => {
+            const visibleItems = section.items.filter(i => !i.adminOnly || isAdmin);
+            if (visibleItems.length === 0) return null;
             return (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-primary-50 text-primary-700 font-semibold'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`
-                  }
-                >
-                  <span className="text-base">{item.icon}</span>
-                  {item.label}
-                </NavLink>
-              </li>
+              <div key={section.label} style={{ marginBottom: '20px' }}>
+                <p style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  color: '#3a3a3a',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  padding: '0 8px',
+                  marginBottom: '4px',
+                }}>
+                  {section.label}
+                </p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {visibleItems.map((item) => (
+                    <li key={item.to}>
+                      <NavLink
+                        to={item.to}
+                        end={item.end}
+                        onClick={onClose}
+                        style={({ isActive }) => ({
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '9px',
+                          padding: '7px 8px',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? '#a78bfa' : '#888',
+                          background: isActive ? 'rgba(124,58,237,0.12)' : 'transparent',
+                          textDecoration: 'none',
+                          transition: 'all 0.12s ease',
+                          marginBottom: '1px',
+                          borderLeft: isActive ? '2px solid #7c3aed' : '2px solid transparent',
+                        })}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget;
+                          if (!el.style.background.includes('rgba(124,58,237,0.12)')) {
+                            el.style.background = 'rgba(255,255,255,0.04)';
+                            el.style.color = '#c0c0c0';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget;
+                          if (!el.style.background.includes('rgba(124,58,237,0.12)')) {
+                            el.style.background = 'transparent';
+                            el.style.color = '#888';
+                          }
+                        }}
+                      >
+                        <span style={{
+                          width: '20px',
+                          height: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '14px',
+                          flexShrink: 0,
+                        }}>
+                          {item.icon}
+                        </span>
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             );
           })}
-        </ul>
-      </nav>
+        </nav>
 
-      {/* Usuario */}
-      <div className="p-4 border-t border-gray-100">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-sm">
-            {user?.name.charAt(0).toUpperCase()}
+        {/* ── User / Logout ── */}
+        <div style={{
+          padding: '12px 8px 16px',
+          borderTop: '1px solid #1a1a1a',
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px',
+            borderRadius: '8px',
+            marginBottom: '6px',
+            background: '#141414',
+            border: '1px solid #1e1e1e',
+          }}>
+            <div style={{
+              width: '30px',
+              height: '30px',
+              background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '12px',
+              flexShrink: 0,
+            }}>
+              {user?.name.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#e0e0e0',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {user?.name}
+              </p>
+              <p style={{ fontSize: '10px', color: '#555', textTransform: 'capitalize' }}>
+                {user?.role}
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-            <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
-          </div>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '7px 8px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: '#666',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+              textAlign: 'left',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)';
+              (e.currentTarget as HTMLButtonElement).style.color = '#f87171';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+              (e.currentTarget as HTMLButtonElement).style.color = '#666';
+            }}
+          >
+            <span style={{ fontSize: '13px' }}>⏻</span>
+            Cerrar sesión
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="w-full text-left text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-        >
-          <span>🚪</span> Cerrar sesión
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
