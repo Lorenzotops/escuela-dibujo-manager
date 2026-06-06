@@ -138,7 +138,10 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* ── Logo ── */}
         <div style={{ padding: '16px', borderBottom: '1px solid #1a1a1a' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+            onClick={() => { navigate(isAdmin ? '/' : '/asistencia'); onClose(); }}
+          >
             {/* Logo imagen — coloca logo.png en frontend/public/ */}
             <img
               src="/logo.jpg"
