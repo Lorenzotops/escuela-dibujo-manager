@@ -73,7 +73,7 @@ export default function Layout() {
               🎨
             </div>
             <span style={{ fontWeight: 600, fontSize: '14px', color: '#f0f0f0' }}>
-              Arte y Color
+              Escuela Lorenzo
             </span>
           </div>
         </header>
