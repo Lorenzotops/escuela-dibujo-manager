@@ -7,8 +7,10 @@ export default function Settings() {
     schoolName: '', address: '', phone: '', email: '',
     cifNif: '', monthlyFee: 55, invoicePrefix: 'FAC', invoiceFooter: '',
   });
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [logoPreview,  setLogoPreview]  = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     api.get('/settings').then(r => {
@@ -23,6 +25,7 @@ export default function Settings() {
         invoicePrefix: s.invoicePrefix || 'FAC',
         invoiceFooter: s.invoiceFooter || '',
       });
+      if (s.logoUrl) setLogoPreview(s.logoUrl);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -43,14 +46,21 @@ export default function Settings() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('logo', file);
-    try {
-      await api.post('/settings/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Logo subido correctamente');
-    } catch {
-      toast.error('Error al subir el logo');
-    }
+    if (file.size > 2 * 1024 * 1024) { toast.error('El logo no puede superar 2MB'); return; }
+
+    setUploadingLogo(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const logoBase64 = reader.result as string;
+      try {
+        await api.post('/settings/logo', { logoBase64 });
+        setLogoPreview(logoBase64);
+        toast.success('Logo guardado correctamente');
+      } catch {
+        toast.error('Error al guardar el logo');
+      } finally { setUploadingLogo(false); }
+    };
+    reader.readAsDataURL(file);
   };
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" /></div>;
@@ -106,10 +116,18 @@ export default function Settings() {
 
         <div className="card space-y-4">
           <h2 className="font-semibold text-gray-800">Logo</h2>
+          {logoPreview && (
+            <div className="flex items-center gap-3">
+              <img src={logoPreview} alt="Logo actual" className="h-16 w-auto rounded border border-gray-200 object-contain bg-white p-1" />
+              <span className="text-xs text-gray-400">Logo actual</span>
+            </div>
+          )}
           <div>
             <label className="label">Subir logo (aparecerá en las facturas)</label>
-            <input type="file" accept="image/*" className="input" onChange={handleLogoUpload} />
-            <p className="text-xs text-gray-400 mt-1">Máximo 2MB. Formatos: JPG, PNG, SVG</p>
+            <input type="file" accept="image/*" className="input" onChange={handleLogoUpload} disabled={uploadingLogo} />
+            <p className="text-xs text-gray-400 mt-1">
+              {uploadingLogo ? '⏳ Subiendo...' : 'Máximo 2MB. Formatos: JPG, PNG. Se guarda en la base de datos.'}
+            </p>
           </div>
         </div>
 

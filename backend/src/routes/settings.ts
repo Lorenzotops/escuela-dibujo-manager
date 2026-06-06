@@ -2,25 +2,9 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { requireAdmin } from '../middleware/roles';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 
 const router  = Router();
 const prisma  = new PrismaClient();
-
-// Configurar multer para subir logo
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const uploadDir = path.join(__dirname, '..', '..', 'uploads');
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    cb(null, `logo${path.extname(file.originalname)}`);
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 } });
 
 router.use(authenticate);
 
@@ -58,19 +42,25 @@ router.put('/', requireAdmin, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/settings/logo — Subir logo
-router.post('/logo', requireAdmin, upload.single('logo'), async (req: AuthRequest, res: Response) => {
+// POST /api/settings/logo — Guardar logo como base64 en la BD (no filesystem)
+router.post('/logo', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
+    const { logoBase64 } = req.body;
+    if (!logoBase64) return res.status(400).json({ error: 'No se recibió ningún archivo' });
 
-    const logoUrl = `/uploads/${req.file.filename}`;
-    const settings = await prisma.settings.findFirst();
-
-    if (settings) {
-      await prisma.settings.update({ where: { id: settings.id }, data: { logoUrl } });
+    // Validar que es una imagen base64 válida
+    if (!logoBase64.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Formato de imagen no válido' });
     }
 
-    res.json({ logoUrl });
+    const settings = await prisma.settings.findFirst();
+    if (settings) {
+      await prisma.settings.update({ where: { id: settings.id }, data: { logoUrl: logoBase64 } });
+    } else {
+      await prisma.settings.create({ data: { logoUrl: logoBase64 } });
+    }
+
+    res.json({ logoUrl: logoBase64 });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -16,6 +16,13 @@ export default function PaymentsList() {
   const [year,     setYear]       = useState(now.getFullYear());
   const [status,   setStatus]     = useState(searchParams.get('status') || '');
   const [view,     setView]       = useState<'lista' | 'deudores'>('lista');
+
+  // Modal generar cuotas
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [genMonth,   setGenMonth]   = useState(now.getMonth() + 1);
+  const [genYear,    setGenYear]    = useState(now.getFullYear());
+  const [generating, setGenerating] = useState(false);
+
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
 
@@ -35,6 +42,18 @@ export default function PaymentsList() {
 
   useEffect(() => { fetchPayments(); }, [month, year, status]);
 
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const res = await api.post('/payments/generate-monthly', { month: genMonth, year: genYear });
+      toast.success(res.data.message);
+      setShowGenerateModal(false);
+      fetchPayments();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al generar cuotas');
+    } finally { setGenerating(false); }
+  };
+
   const markPaid = async (payment: any) => {
     try {
       await api.put(`/payments/${payment.id}`, { status: 'pagado', paidAt: new Date().toISOString() });
@@ -47,10 +66,49 @@ export default function PaymentsList() {
 
   return (
     <div className="space-y-4">
+      {/* Modal generar cuotas */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-sm space-y-4">
+            <h2 className="text-lg font-bold">⚡ Generar cuotas del mes</h2>
+            <p className="text-sm text-gray-400">
+              Crea cuotas en estado <span className="badge-pendiente">pendiente</span> para todos los alumnos activos que aún no tengan registro ese mes.
+            </p>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="label">Mes</label>
+                <select className="input w-full" value={genMonth} onChange={e => setGenMonth(Number(e.target.value))}>
+                  {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="label">Año</label>
+                <select className="input w-full" value={genYear} onChange={e => setGenYear(Number(e.target.value))}>
+                  {[2024, 2025, 2026, 2027].map(y => <option key={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button className="btn-secondary flex-1" onClick={() => setShowGenerateModal(false)} disabled={generating}>
+                Cancelar
+              </button>
+              <button className="btn-primary flex-1" onClick={handleGenerate} disabled={generating}>
+                {generating ? 'Generando...' : '⚡ Generar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Pagos</h1>
         {isAdmin && (
-          <button className="btn-primary" onClick={() => navigate('/pagos/nuevo')}>+ Registrar pago</button>
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={() => { setGenMonth(month); setGenYear(year); setShowGenerateModal(true); }}>
+              ⚡ Generar cuotas
+            </button>
+            <button className="btn-primary" onClick={() => navigate('/pagos/nuevo')}>+ Registrar pago</button>
+          </div>
         )}
       </div>
 
