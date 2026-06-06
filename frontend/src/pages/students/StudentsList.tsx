@@ -26,22 +26,33 @@ function calcAge(birthDate: string) {
 }
 
 export default function StudentsList() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [search,   setSearch]   = useState('');
-  const [loading,  setLoading]  = useState(true);
+  const [students,   setStudents]   = useState<Student[]>([]);
+  const [paymentMap, setPaymentMap] = useState<Record<number, any>>({});
+  const [search,     setSearch]     = useState('');
+  const [loading,    setLoading]    = useState(true);
   const [searchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
 
-  const fetchStudents = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
+      const now = new Date();
       const params: any = {};
       if (search)       params.search = search;
       if (statusFilter) params.status = statusFilter;
-      const { data } = await api.get('/students', { params });
-      setStudents(data);
+
+      const [studentsRes, paymentsRes] = await Promise.all([
+        api.get('/students', { params }),
+        api.get('/payments', { params: { month: now.getMonth() + 1, year: now.getFullYear() } }),
+      ]);
+
+      setStudents(studentsRes.data);
+
+      const map: Record<number, any> = {};
+      paymentsRes.data.forEach((p: any) => { map[p.studentId] = p; });
+      setPaymentMap(map);
     } catch {
       toast.error('Error al cargar alumnos');
     } finally {
@@ -49,9 +60,25 @@ export default function StudentsList() {
     }
   };
 
-  useEffect(() => { fetchStudents(); }, [statusFilter]);
+  useEffect(() => { fetchData(); }, [statusFilter]);
 
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchStudents(); };
+  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchData(); };
+
+  const PaymentCell = ({ student }: { student: Student }) => {
+    if (student.status === 'baja') return <span className="text-gray-400 text-xs">—</span>;
+    const p = paymentMap[student.id];
+    if (!p) return (
+      <span className="badge-atrasado text-xs">Sin pago</span>
+    );
+    if (p.status === 'pagado') return (
+      <div>
+        <span className="badge-pagado text-xs">Pagado</span>
+        {p.paidAt && <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{new Date(p.paidAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</p>}
+      </div>
+    );
+    if (p.status === 'atrasado') return <span className="badge-atrasado text-xs">Atrasado</span>;
+    return <span className="badge-pendiente text-xs">Pendiente</span>;
+  };
 
   return (
     <div className="space-y-4">
@@ -59,7 +86,7 @@ export default function StudentsList() {
         <h1 className="text-2xl font-bold text-gray-900">Alumnos</h1>
         {isAdmin && (
           <button className="btn-primary flex items-center gap-2" onClick={() => navigate('/alumnos/nuevo')}>
-            <span>+</span> Nuevo alumno
+            + Nuevo alumno
           </button>
         )}
       </div>
@@ -70,7 +97,7 @@ export default function StudentsList() {
           <input
             type="text"
             className="input flex-1"
-            placeholder="Buscar por nombre, DNI, tutor, teléfono, colegio..."
+            placeholder="Buscar por nombre, DNI, tutor, teléfono..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -95,9 +122,9 @@ export default function StudentsList() {
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">Alumno</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600 hidden md:table-cell">Edad</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600 hidden lg:table-cell">Colegio</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600 hidden md:table-cell">Grupo</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600 hidden sm:table-cell">Tutor</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Pago mes</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">Estado</th>
                 </tr>
               </thead>
@@ -115,7 +142,6 @@ export default function StudentsList() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{calcAge(s.birthDate)} años</td>
-                    <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{s.school || '—'}</td>
                     <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
                       {s.studentGroups[0]?.group.name || '—'}
                     </td>
@@ -126,6 +152,9 @@ export default function StudentsList() {
                           <p className="text-xs text-gray-400">{s.guardians[0].phone}</p>
                         </div>
                       ) : '—'}
+                    </td>
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <PaymentCell student={s} />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`badge-${s.status}`}>{s.status}</span>

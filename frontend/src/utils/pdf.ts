@@ -3,6 +3,100 @@ import autoTable from 'jspdf-autotable';
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+// Añade una factura como página(s) a un doc jsPDF existente
+function addInvoicePage(doc: jsPDF, invoice: any, settings: any, isFirst: boolean) {
+  if (!isFirst) doc.addPage();
+  const pageW = 210;
+  const margin = 20;
+
+  doc.setFillColor(14, 148, 233);
+  doc.rect(0, 0, pageW, 40, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text(settings?.schoolName || 'Escuela de Dibujo', margin, 18);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  if (settings?.address) doc.text(settings.address, margin, 26);
+  if (settings?.phone || settings?.email) doc.text(`${settings?.phone || ''} | ${settings?.email || ''}`, margin, 32);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FACTURA', pageW - margin, 18, { align: 'right' });
+  doc.setFontSize(14);
+  doc.text(invoice.invoiceNumber, pageW - margin, 26, { align: 'right' });
+
+  doc.setTextColor(30, 41, 59);
+  let y = 55;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fecha de emisión:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(new Date(invoice.issueDate).toLocaleDateString('es-ES'), margin + 38, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Periodo:', 120, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${MONTHS[invoice.billedMonth - 1]} ${invoice.billedYear}`, 137, y);
+
+  y += 12;
+  doc.setFillColor(248, 250, 252);
+  doc.rect(margin, y - 5, pageW - margin * 2, 28, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.rect(margin, y - 5, pageW - margin * 2, 28);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text('FACTURAR A', margin + 4, y + 1);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(invoice.guardianName || invoice.student?.fullName || '—', margin + 4, y + 8);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Alumno/a: ${invoice.student?.fullName || '—'}`, margin + 4, y + 15);
+  if (invoice.guardianDni) doc.text(`DNI: ${invoice.guardianDni}`, margin + 4, y + 21);
+
+  y += 38;
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [['Concepto', 'Mes', 'Importe']],
+    body: [[
+      invoice.concept || 'Cuota mensual Escuela de Dibujo',
+      `${MONTHS[invoice.billedMonth - 1]} ${invoice.billedYear}`,
+      `${Number(invoice.amount).toFixed(2)} €`,
+    ]],
+    headStyles: { fillColor: [14, 148, 233], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'left' },
+    columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40 }, 2: { cellWidth: 30, halign: 'right', fontStyle: 'bold' } },
+    styles: { fontSize: 10 },
+  });
+
+  const tableEndY = (doc as any).lastAutoTable.finalY + 4;
+  doc.setFillColor(14, 148, 233);
+  doc.rect(pageW - margin - 60, tableEndY, 60, 10, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text(`TOTAL: ${Number(invoice.amount).toFixed(2)} €`, pageW - margin - 4, tableEndY + 7, { align: 'right' });
+
+  const footerY = 270;
+  doc.setDrawColor(226, 232, 240);
+  doc.line(margin, footerY, pageW - margin, footerY);
+  doc.setTextColor(150, 163, 175);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(settings?.invoiceFooter || 'Gracias por confiar en nosotros.', pageW / 2, footerY + 6, { align: 'center' });
+}
+
+// Descarga múltiples facturas como un solo PDF (una página por factura)
+export function generateCombinedInvoicesPDF(invoicesWithSettings: Array<{ invoice: any; settings: any }>, filename: string) {
+  if (invoicesWithSettings.length === 0) return;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  invoicesWithSettings.forEach(({ invoice, settings }, i) => {
+    addInvoicePage(doc, invoice, settings, i === 0);
+  });
+  doc.save(filename);
+}
+
 export function generateInvoicePDF(invoice: any, settings: any) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageW = 210;
