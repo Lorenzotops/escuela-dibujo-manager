@@ -141,7 +141,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Logo imagen — coloca logo.png en frontend/public/ */}
             <img
-              src="/logo.png"
+              src="/logo.jpg"
               alt="Logo Escuela Lorenzo"
               style={{
                 width: '40px',
