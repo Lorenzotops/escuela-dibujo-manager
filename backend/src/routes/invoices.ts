@@ -153,6 +153,29 @@ router.post('/batch', requireAdmin, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/invoices/sync-paid — Sincronizar facturas "emitida" que tienen pago "pagado"
+router.post('/sync-paid', requireAdmin, async (_req: AuthRequest, res: Response) => {
+  try {
+    // Buscar facturas emitidas cuyo pago vinculado ya está pagado
+    const toUpdate = await prisma.invoice.findMany({
+      where: { status: 'emitida', payment: { status: 'pagado' } },
+    });
+
+    if (toUpdate.length === 0) {
+      return res.json({ message: 'Todo ya estaba sincronizado', updated: 0 });
+    }
+
+    await prisma.invoice.updateMany({
+      where: { id: { in: toUpdate.map(i => i.id) } },
+      data: { status: 'pagada' },
+    });
+
+    res.json({ message: `${toUpdate.length} facturas actualizadas a "pagada"`, updated: toUpdate.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PUT /api/invoices/:id/cancel — Anular factura
 router.put('/:id/cancel', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {

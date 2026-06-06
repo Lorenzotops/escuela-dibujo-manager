@@ -15,13 +15,18 @@ async function getNextInvoiceNumber(): Promise<string> {
   return `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(4, '0')}`;
 }
 
-// Helper: crea factura automática para un pago (si no existe ya)
+// Helper: crea o actualiza factura automática para un pago
 async function createAutoInvoice(paymentId: number) {
-  // No duplicar si ya hay una factura para este pago
   const existing = await prisma.invoice.findFirst({
     where: { paymentId, status: { not: 'anulada' } },
   });
-  if (existing) return;
+  // Si ya existe y está emitida, actualizarla a pagada
+  if (existing) {
+    if (existing.status === 'emitida') {
+      await prisma.invoice.update({ where: { id: existing.id }, data: { status: 'pagada' } });
+    }
+    return;
+  }
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -199,8 +204,12 @@ router.put('/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Si se marca como pagado, generar factura automáticamente
+    // Si se marca como pagado, actualizar factura existente o crear nueva
     if (status === 'pagado') {
+      await prisma.invoice.updateMany({
+        where: { paymentId: updated.id, status: 'emitida' },
+        data: { status: 'pagada' },
+      });
       await createAutoInvoice(updated.id);
     }
 
