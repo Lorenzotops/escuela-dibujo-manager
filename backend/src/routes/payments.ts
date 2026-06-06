@@ -6,6 +6,53 @@ import { requireAdmin } from '../middleware/roles';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Helper: genera el siguiente número de factura
+async function getNextInvoiceNumber(): Promise<string> {
+  const settings = await prisma.settings.findFirst();
+  const prefix  = settings?.invoicePrefix || 'FAC';
+  const counter = settings?.invoiceCounter || 1;
+  await prisma.settings.updateMany({ data: { invoiceCounter: counter + 1 } });
+  return `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(4, '0')}`;
+}
+
+// Helper: crea factura automática para un pago (si no existe ya)
+async function createAutoInvoice(paymentId: number) {
+  // No duplicar si ya hay una factura para este pago
+  const existing = await prisma.invoice.findFirst({
+    where: { paymentId, status: { not: 'anulada' } },
+  });
+  if (existing) return;
+
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: {
+      student: {
+        include: { guardians: { where: { isPrimary: true } } },
+      },
+    },
+  });
+  if (!payment) return;
+
+  const guardian = payment.student.guardians[0];
+  const invoiceNumber = await getNextInvoiceNumber();
+
+  await prisma.invoice.create({
+    data: {
+      invoiceNumber,
+      studentId:   payment.studentId,
+      paymentId:   payment.id,
+      billedMonth: payment.month,
+      billedYear:  payment.year,
+      amount:      payment.amount,
+      concept:     'Cuota mensual Escuela de Dibujo',
+      guardianName: guardian?.fullName || '',
+      guardianDni:  guardian?.dni || '',
+      status:      'pagada',
+      issueDate:   new Date(),
+    },
+  });
+}
+
 router.use(authenticate);
 
 // GET /api/payments
@@ -104,11 +151,13 @@ router.post('/', requireAdmin, async (req: AuthRequest, res: Response) => {
         },
       });
 
-      // Actualizar factura si existe
-      await prisma.invoice.updateMany({
-        where: { paymentId: existing.id },
-        data: { status: 'pagada' },
-      });
+      // Actualizar factura si existe, o crear una nueva
+      const invoiceExists = await prisma.invoice.findFirst({ where: { paymentId: existing.id, status: { not: 'anulada' } } });
+      if (invoiceExists) {
+        await prisma.invoice.updateMany({ where: { paymentId: existing.id }, data: { status: 'pagada' } });
+      } else {
+        await createAutoInvoice(existing.id);
+      }
 
       return res.json(updated);
     }
@@ -125,6 +174,9 @@ router.post('/', requireAdmin, async (req: AuthRequest, res: Response) => {
         notes: notes || '',
       },
     });
+
+    // Crear factura automáticamente
+    await createAutoInvoice(payment.id);
 
     res.status(201).json(payment);
   } catch (err: any) {
@@ -146,6 +198,12 @@ router.put('/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
         method,
       },
     });
+
+    // Si se marca como pagado, generar factura automáticamente
+    if (status === 'pagado') {
+      await createAutoInvoice(updated.id);
+    }
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
