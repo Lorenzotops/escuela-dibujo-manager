@@ -60,18 +60,22 @@ export default function Layout() {
             </svg>
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img
+              src="/logo.jpg"
+              alt="Logo"
+              style={{ width: '28px', height: '28px', borderRadius: '7px', objectFit: 'cover' }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.style.display = 'none';
+                const fb = img.nextSibling as HTMLElement;
+                if (fb) fb.style.display = 'flex';
+              }}
+            />
             <div style={{
-              width: '28px',
-              height: '28px',
+              width: '28px', height: '28px', display: 'none',
               background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
-              borderRadius: '7px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '14px',
-            }}>
-              🎨
-            </div>
+              borderRadius: '7px', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
+            }}>🎨</div>
             <span style={{ fontWeight: 600, fontSize: '14px', color: '#f0f0f0' }}>
               Escuela Lorenzo
             </span>
@@ -79,28 +83,21 @@ export default function Layout() {
         </header>
 
         {/* ── Main content ── */}
-        <main style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-        }}>
-          <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto',
-            padding: '24px 24px',
-          }}>
+        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <div className="main-content-pad" style={{ maxWidth: '1200px', margin: '0 auto' }}>
             <Outlet />
           </div>
         </main>
       </div>
 
-      {/* Fix: on mobile, no left margin */}
       <style>{`
         @media (max-width: 1023px) {
           .lg-margin { margin-left: 0 !important; }
+          .main-content-pad { padding: 16px 14px; }
         }
         @media (min-width: 1024px) {
           aside { position: static !important; transform: none !important; }
+          .main-content-pad { padding: 24px 28px; }
         }
       `}</style>
     </div>

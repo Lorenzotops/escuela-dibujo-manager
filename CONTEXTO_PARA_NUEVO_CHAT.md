@@ -1,6 +1,6 @@
 # PROMPT DE CONTEXTO — Escuela Lorenzo Manager
 # Pega este texto completo al inicio de un nuevo chat para retomar el proyecto
-# Generado el 6 de junio de 2026 — Versión 2.0
+# Actualizado el 6 de junio de 2026 — Versión 2.1
 
 ---
 
@@ -310,7 +310,7 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 
 ---
 
-## FUNCIONALIDADES IMPLEMENTADAS (v2.0)
+## FUNCIONALIDADES IMPLEMENTADAS (v2.1)
 
 ### Lo que YA funciona:
 - ✅ Login con roles (admin / profesor)
@@ -319,28 +319,28 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 - ✅ Tutores/padres con botón directo a WhatsApp
 - ✅ Registro de pagos con detección automática de cuotas anteriores pendientes
 - ✅ Generación de facturas en PDF (individuales y en lote)
-- ✅ **NUEVO** Descarga masiva de facturas: checkboxes + "Descargar selección" + "Descargar todo" (PDF combinado multipágina)
+- ✅ Descarga masiva de facturas: checkboxes + "Descargar selección" + "Descargar todo" (PDF combinado multipágina)
 - ✅ Pasar lista por grupo (presente/ausente/justificado)
-- ✅ **NUEVO** Vista "Hoy" en asistencia: resumen del día por grupo con estado de cada alumno
-- ✅ **NUEVO** Vista "Historial" en asistencia: selector de grupo + fecha para ver registros pasados
+- ✅ Vista "Hoy" en asistencia: resumen del día por grupo con estado de cada alumno
+- ✅ Vista "Historial" en asistencia: selector de grupo + fecha para ver registros pasados
 - ✅ Módulo de bajas con motivos y estadísticas
 - ✅ Módulo de grupos con barra de capacidad en tiempo real
-- ✅ **NUEVO** Gestión de alumnos al editar grupo: añadir alumnos (búsqueda), quitar alumnos
-- ✅ **NUEVO** Lista de alumnos con columna "Pago mes" (estado + fecha último pago) en lugar de "Colegio"
+- ✅ Gestión de alumnos al editar grupo: añadir alumnos (búsqueda), quitar alumnos
+- ✅ Lista de alumnos con columna "Pago mes" (estado + fecha último pago)
 - ✅ Estadísticas: ingresos por mes, alumnos por grupo, motivos de baja, colegios
 - ✅ Configuración de la escuela con logo
 - ✅ Gestión de usuarios
 - ✅ Plantillas de WhatsApp con variables dinámicas
-- ✅ **NUEVO** Sistema de permisos: profesores solo ven Asistencia, Nuevo alumno, Registrar pago
-- ✅ **NUEVO** Nombre: "Escuela Lorenzo" en toda la app
-- ✅ **NUEVO** Logo personalizado (`/logo.jpg`) en el sidebar — clickable, navega al inicio
-- ✅ **NUEVO** Dark mode premium estilo Linear/Notion (violeta/índigo)
+- ✅ Sistema de permisos: profesores solo ven Asistencia, Nuevo alumno, Registrar pago
+- ✅ Dark mode premium estilo Linear/Notion (violeta/índigo)
+- ✅ **v2.1** Botón "⚡ Generar cuotas del mes" en Pagos — crea cuotas pendientes para todos los activos
+- ✅ **v2.1** Logo persistente: se guarda como base64 en la BD (no filesystem), sobrevive deploys de Railway
+- ✅ **v2.1** Factura automática al cobrar: al registrar pago o pulsar "✓ Cobrado", se crea la factura sola
+- ✅ **v2.1** Endpoint `POST /api/invoices/sync-paid` para sincronizar facturas emitidas con pagos cobrados
 
 ---
 
 ## FUNCIONES PENDIENTES / IDEAS PARA V3
-- ❌ **Generar cuotas mensuales**: endpoint existe (`POST /api/payments/generate-monthly`) pero NO hay botón en la UI
-- ❌ **Logo persistente en producción**: el upload a Settings guarda en filesystem (Railway lo borra en cada deploy). Necesita Cloudinary o S3
 - ❌ Exportación a Excel de listas de alumnos y pagos
 - ❌ Envío de emails automáticos de recordatorio de pago
 - ❌ Lista de espera para grupos llenos
@@ -365,6 +365,7 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 6. `TakeAttendance` lee `groupId` y `date` desde URL params
 7. **Build Vercel**: cambiado `"build": "tsc && vite build"` → `"build": "vite build"` en `frontend/package.json`
 8. **Logo**: guardado como `logo.jpg` (no `.png`), referenciado como `/logo.jpg` en Sidebar.tsx
+9. **Facturas emitida→pagada**: `createAutoInvoice` ahora actualiza facturas existentes en estado "emitida" al cobrar un pago. También `PUT /payments/:id` hace `updateMany` directo. Datos históricos corregidos via Railway console (16 facturas actualizadas).
 
 ---
 
@@ -408,8 +409,19 @@ npx prisma db seed
 
 ---
 
-## HISTORIAL DE COMMITS (sesión actual)
+## ENDPOINTS AÑADIDOS EN v2.1
 ```
+POST   /api/payments/generate-monthly  ← ✅ YA TIENE BOTÓN en PaymentsList (admin only)
+POST   /api/invoices/sync-paid         ← sincroniza facturas emitidas con pagos cobrados (uso puntual)
+POST   /api/settings/logo              ← ahora acepta JSON { logoBase64 } en lugar de multipart
+```
+
+---
+
+## HISTORIAL DE COMMITS
+```
+feat: factura auto al cobrar + fix estado emitida→pagada + sync endpoint  ← sesión 6/6/2026
+feat: generar cuotas mensuales UI + logo persistente base64 en BD         ← sesión 6/6/2026
 fix: logo clickable navega al inicio
 feat: escuela lorenzo, permisos por rol, logo
 feat: gestion alumnos grupo, pago en lista, historial asistencia, descarga masiva facturas
@@ -421,6 +433,12 @@ Primera version Escuela de Dibujo Manager
 ```
 
 ---
-*Generado el 6 de junio de 2026 — Versión 2.0 en producción*
+
+## INSTRUCCIÓN DE MEMORIA (leer al inicio de cada sesión)
+Al iniciar una nueva sesión, lee este archivo para entender el estado actual.
+Al terminar, actualiza: FUNCIONALIDADES IMPLEMENTADAS, FUNCIONES PENDIENTES, BUGS CORREGIDOS e HISTORIAL DE COMMITS.
+
+---
+*Actualizado el 6 de junio de 2026 — Versión 2.1 en producción*
 *Frontend: https://escuela-dibujo-manager.vercel.app*
 *Backend: https://escuela-dibujo-manager-production.up.railway.app*

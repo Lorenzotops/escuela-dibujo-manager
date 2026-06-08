@@ -103,7 +103,7 @@ export default function PaymentsList() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Pagos</h1>
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button className="btn-secondary" onClick={() => { setGenMonth(month); setGenYear(year); setShowGenerateModal(true); }}>
               ⚡ Generar cuotas
             </button>

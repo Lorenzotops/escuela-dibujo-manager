@@ -81,13 +81,13 @@ export default function AttendancePage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
         {tabs.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             style={{
-              padding: '8px 16px',
+              padding: '8px 14px',
               fontSize: '13px',
               fontWeight: tab === t.key ? 600 : 400,
               color: tab === t.key ? 'var(--accent-t)' : 'var(--text-2)',
@@ -97,6 +97,8 @@ export default function AttendancePage() {
               cursor: 'pointer',
               transition: 'all 0.15s',
               marginBottom: '-1px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             {t.label}

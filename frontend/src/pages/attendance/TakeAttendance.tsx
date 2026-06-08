@@ -121,10 +121,10 @@ export default function TakeAttendance() {
           ) : (
             <>
               {/* Marcar todos */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-gray-600 font-medium">Marcar todos:</span>
-                <button onClick={() => setAll('presente')} className="text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-lg hover:bg-green-100">✓ Todos presentes</button>
-                <button onClick={() => setAll('ausente')} className="text-sm bg-red-50 text-red-700 border border-red-200 px-3 py-1 rounded-lg hover:bg-red-100">✗ Todos ausentes</button>
+                <button onClick={() => setAll('presente')} className="text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-lg hover:bg-green-100">✓ Todos presentes</button>
+                <button onClick={() => setAll('ausente')} className="text-sm bg-red-50 text-red-700 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-100">✗ Todos ausentes</button>
               </div>
 
               {/* Resumen */}
@@ -148,22 +148,24 @@ export default function TakeAttendance() {
                 {students.map(({ student }) => {
                   const rec = records[student.id] || { status: 'presente' as AttStatus, notes: '' };
                   return (
-                    <div key={student.id} className={`card p-4 transition-all border-l-4 ${rec.status === 'presente' ? 'border-green-400' : rec.status === 'ausente' ? 'border-red-400' : 'border-yellow-400'}`}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center font-semibold text-gray-600 text-sm">
+                    <div key={student.id} className={`card transition-all border-l-4 ${rec.status === 'presente' ? 'border-green-400' : rec.status === 'ausente' ? 'border-red-400' : 'border-yellow-400'}`}
+                      style={{ padding: '12px 14px' }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center font-semibold text-gray-600 text-sm flex-shrink-0">
                             {student.fullName.charAt(0)}
                           </div>
-                          <span className="font-medium text-gray-900">{student.fullName}</span>
+                          <span className="font-medium text-gray-900 truncate text-sm">{student.fullName}</span>
                         </div>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1.5 flex-shrink-0">
                           {(['presente', 'ausente', 'justificado'] as AttStatus[]).map(s => (
                             <button
                               key={s}
                               onClick={() => setStatus(student.id, s)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${rec.status === s ? STATUS_COLORS[s] : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                              style={{ minWidth: '44px', minHeight: '44px' }}
+                              className={`rounded-lg text-xs font-bold capitalize transition-all ${rec.status === s ? STATUS_COLORS[s] : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                             >
-                              {s.charAt(0).toUpperCase()}
+                              {s === 'presente' ? '✓' : s === 'ausente' ? '✗' : 'J'}
                             </button>
                           ))}
                         </div>
