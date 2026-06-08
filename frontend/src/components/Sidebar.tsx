@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -53,8 +54,18 @@ const profesorSections = [
   },
 ];
 
+// Navegación para PADRE
+const padreSections = [
+  {
+    label: 'Mi familia',
+    items: [
+      { to: '/panel-padre', label: 'Panel familiar', icon: '🏠', end: true },
+    ],
+  },
+];
+
 export default function Sidebar({ open, onClose }: SidebarProps) {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isPadre } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -62,7 +73,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     navigate('/login');
   };
 
-  const sections = isAdmin ? adminSections : profesorSections;
+  const sections = isAdmin ? adminSections : isPadre ? padreSections : profesorSections;
+  const roleLabel = isAdmin ? 'Administración' : isPadre ? 'Familia' : 'Profesor';
+  const homeRoute = isAdmin ? '/' : isPadre ? '/panel-padre' : '/asistencia';
 
   const renderNavItem = (item: { to: string; label: string; icon: string; end?: boolean }) => (
     <li key={item.to}>
@@ -140,7 +153,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <div style={{ padding: '16px', borderBottom: '1px solid #1a1a1a' }}>
           <div
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-            onClick={() => { navigate(isAdmin ? '/' : '/asistencia'); onClose(); }}
+            onClick={() => { navigate(homeRoute); onClose(); }}
           >
             {/* Logo imagen — coloca logo.png en frontend/public/ */}
             <img
@@ -175,7 +188,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 Escuela Lorenzo
               </p>
               <p style={{ fontSize: '10px', color: '#555', marginTop: '1px' }}>
-                {isAdmin ? 'Administración' : 'Profesor'}
+                {roleLabel}
               </p>
             </div>
           </div>

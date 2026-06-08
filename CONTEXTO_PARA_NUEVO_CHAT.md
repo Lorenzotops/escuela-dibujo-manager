@@ -1,6 +1,6 @@
 # PROMPT DE CONTEXTO — Escuela Lorenzo Manager
 # Pega este texto completo al inicio de un nuevo chat para retomar el proyecto
-# Actualizado el 6 de junio de 2026 — Versión 2.1
+# Actualizado el 8 de junio de 2026 — Versión 2.2
 
 ---
 
@@ -337,22 +337,56 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 - ✅ **v2.1** Logo persistente: se guarda como base64 en la BD (no filesystem), sobrevive deploys de Railway
 - ✅ **v2.1** Factura automática al cobrar: al registrar pago o pulsar "✓ Cobrado", se crea la factura sola
 - ✅ **v2.1** Endpoint `POST /api/invoices/sync-paid` para sincronizar facturas emitidas con pagos cobrados
+- ✅ **v2.2** Mejoras móvil: padding responsivo (16px móvil / 28px desktop), logo real en header móvil
+- ✅ **v2.2** Todos los botones con min-height 44px (estándar táctil Apple/Google)
+- ✅ **v2.2** TakeAttendance: botones ✓/✗/J de 44×44px, nombres largos truncados, "Marcar todos" con flex-wrap
+- ✅ **v2.2** PaymentsList: botones admin se apilan en móvil (flex-wrap)
+- ✅ **v2.2** Tabs de asistencia: scroll horizontal en pantallas muy pequeñas, whiteSpace nowrap
+- ✅ **v2.2** Dashboard: fecha oculta en móvil para no chocar con el título
 
 ---
 
-## FUNCIONES PENDIENTES / IDEAS PARA V3
-- ❌ Exportación a Excel de listas de alumnos y pagos
-- ❌ Envío de emails automáticos de recordatorio de pago
+## VISIÓN DE PRODUCTO — ROADMAP DE MONETIZACIÓN
+El objetivo es convertir esta app en un SaaS vendible a academias de dibujo (y similares).
+Precio objetivo: 39-59 €/mes por academia.
+
+### FASE 1 — Pulir el producto (EN CURSO)
+Objetivo: que la app esté impecable con Escuela Lorenzo como cliente real.
+- ✅ Mejoras móvil (v2.2)
+- ❌ **Email básico** — integrar Resend o SendGrid: recordatorio de pago a padres + recuperación de contraseña
+- ❌ **Exportación a Excel** — lista de alumnos y pagos en .xlsx
+- ❌ Búsqueda en tiempo real de alumnos (ahora requiere pulsar Enter)
+- ❌ Filtro por grupo en lista de pagos (backend listo con `?groupId=`, falta UI)
+
+### FASE 2 — Multi-tenancy (CRÍTICO para vender)
+Cada academia tiene sus datos completamente aislados. Es el cambio arquitectural más grande.
+- Añadir campo `schoolId` a todos los modelos de BD
+- Todos los endpoints filtran por `schoolId` del usuario autenticado
+- Flujo de registro: una academia se da de alta sola, crea su admin, configura su escuela
+
+### FASE 3 — Landing page + Stripe + onboarding
+- Página de ventas (describe la app, precio, botón "Prueba 30 días gratis")
+- Stripe para cobrar suscripción mensual automática
+- Onboarding: registro → configuración → primer alumno en 5 minutos
+
+### FASE 4 — Legal + primer cliente de pago
+- Política de privacidad y términos de servicio
+- Acuerdo de tratamiento de datos (obligatorio por GDPR — la app maneja datos de menores)
+- Con esto listo: cobrar legalmente
+
+---
+
+## FUNCIONES PENDIENTES / BACKLOG TÉCNICO
+- ❌ Email: recordatorio de pago + recuperación de contraseña (Fase 1)
+- ❌ Exportación a Excel (Fase 1)
+- ❌ Búsqueda en tiempo real de alumnos (Fase 1)
+- ❌ Filtro por grupo en lista de pagos — UI (backend ya listo)
 - ❌ Lista de espera para grupos llenos
-- ❌ Notificaciones de ausencia: endpoint existe pero no hay botón en UI
+- ❌ Notificaciones de ausencia — botón en UI (endpoint ya existe)
 - ❌ WhatsApp Business API real (ahora solo abre wa.me)
-- ❌ Historial de mensajes enviados
-- ❌ Filtro por grupo en lista de pagos (el backend acepta `?groupId=` pero la UI no tiene selector)
-- ❌ Búsqueda en tiempo real de alumnos (ahora requiere pulsar Enter/botón)
 - ❌ Copia de seguridad automática de la BD
-- ❌ Migración a PostgreSQL si crece a más de 200 alumnos (ya hecho en producción)
-- ❌ Estadísticas avanzadas (retención, tendencias)
-- ❌ App móvil
+- ❌ Estadísticas avanzadas (retención de alumnos, tendencias de ingresos)
+- ❌ Log de auditoría (quién cambió qué y cuándo)
 
 ---
 
@@ -366,6 +400,7 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 7. **Build Vercel**: cambiado `"build": "tsc && vite build"` → `"build": "vite build"` en `frontend/package.json`
 8. **Logo**: guardado como `logo.jpg` (no `.png`), referenciado como `/logo.jpg` en Sidebar.tsx
 9. **Facturas emitida→pagada**: `createAutoInvoice` ahora actualiza facturas existentes en estado "emitida" al cobrar un pago. También `PUT /payments/:id` hace `updateMany` directo. Datos históricos corregidos via Railway console (16 facturas actualizadas).
+10. **Móvil**: padding del layout era fijo 24px — ahora responsivo. Botones tenían ~32px altura — ahora min 44px. Header móvil mostraba icono genérico — ahora muestra logo.jpg real.
 
 ---
 
@@ -409,7 +444,7 @@ npx prisma db seed
 
 ---
 
-## ENDPOINTS AÑADIDOS EN v2.1
+## ENDPOINTS AÑADIDOS EN v2.1 / v2.2
 ```
 POST   /api/payments/generate-monthly  ← ✅ YA TIENE BOTÓN en PaymentsList (admin only)
 POST   /api/invoices/sync-paid         ← sincroniza facturas emitidas con pagos cobrados (uso puntual)
@@ -420,8 +455,9 @@ POST   /api/settings/logo              ← ahora acepta JSON { logoBase64 } en l
 
 ## HISTORIAL DE COMMITS
 ```
-feat: factura auto al cobrar + fix estado emitida→pagada + sync endpoint  ← sesión 6/6/2026
-feat: generar cuotas mensuales UI + logo persistente base64 en BD         ← sesión 6/6/2026
+feat: mejoras móvil - padding, logo header, botones táctiles, tabs asistencia  ← sesión 8/6/2026
+feat: factura auto al cobrar + fix estado emitida→pagada + sync endpoint        ← sesión 6/6/2026
+feat: generar cuotas mensuales UI + logo persistente base64 en BD               ← sesión 6/6/2026
 fix: logo clickable navega al inicio
 feat: escuela lorenzo, permisos por rol, logo
 feat: gestion alumnos grupo, pago en lista, historial asistencia, descarga masiva facturas
@@ -439,6 +475,6 @@ Al iniciar una nueva sesión, lee este archivo para entender el estado actual.
 Al terminar, actualiza: FUNCIONALIDADES IMPLEMENTADAS, FUNCIONES PENDIENTES, BUGS CORREGIDOS e HISTORIAL DE COMMITS.
 
 ---
-*Actualizado el 6 de junio de 2026 — Versión 2.1 en producción*
+*Actualizado el 8 de junio de 2026 — Versión 2.2 en producción*
 *Frontend: https://escuela-dibujo-manager.vercel.app*
 *Backend: https://escuela-dibujo-manager-production.up.railway.app*

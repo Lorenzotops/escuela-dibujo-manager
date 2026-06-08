@@ -5,6 +5,8 @@ import Layout from './components/Layout';
 
 // Páginas
 import Login            from './pages/Login';
+import RegisterParent   from './pages/auth/RegisterParent';
+import ParentDashboard  from './pages/parent/ParentDashboard';
 import Dashboard        from './pages/Dashboard';
 import StudentsList     from './pages/students/StudentsList';
 import StudentForm      from './pages/students/StudentForm';
@@ -22,15 +24,20 @@ import Stats            from './pages/stats/Stats';
 import Settings         from './pages/settings/Settings';
 import Users            from './pages/users/Users';
 
-// Ruta privada — cualquier usuario logueado
+// Spinner de carga reutilizable
+const Spinner = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" />
+  </div>
+);
+
+// Ruta privada — cualquier usuario logueado (excepto padres, que van a su propio panel)
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" />
-    </div>
-  );
-  return user ? <>{children}</> : <Navigate to="/login" />;
+  const { user, loading, isPadre } = useAuth();
+  if (loading) return <Spinner />;
+  if (!user) return <Navigate to="/login" />;
+  if (isPadre) return <Navigate to="/panel-padre" />;
+  return <>{children}</>;
 };
 
 // Ruta solo admin — redirige al inicio si no es admin
@@ -48,10 +55,26 @@ const AdminOrProfesorRoute: React.FC<{ children: React.ReactNode }> = ({ childre
   return <>{children}</>;
 };
 
+// Ruta exclusiva para padres
+const PadreRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isPadre, loading } = useAuth();
+  if (loading) return <Spinner />;
+  if (!user) return <Navigate to="/login" />;
+  if (!isPadre) return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/registro-padre" element={<RegisterParent />} />
+
+      {/* Panel exclusivo para padres — usa el Layout pero con menú propio */}
+      <Route path="/panel-padre" element={<PadreRoute><Layout /></PadreRoute>}>
+        <Route index element={<ParentDashboard />} />
+      </Route>
+
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
 
         {/* Dashboard — solo admin */}

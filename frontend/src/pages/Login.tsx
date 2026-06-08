@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -70,6 +70,16 @@ export default function Login() {
             Profesor: ana@arteycolor.es / prof123
           </div>
         </div>
+
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: '#888' }}>
+          ¿Eres padre/madre?{' '}
+          <Link
+            to="/registro-padre"
+            style={{ color: '#a78bfa', textDecoration: 'none', fontWeight: 500 }}
+          >
+            Crea tu cuenta aquí
+          </Link>
+        </p>
       </div>
     </div>
   );

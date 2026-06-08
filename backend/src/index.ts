@@ -16,6 +16,7 @@ import withdrawalRoutes from './routes/withdrawals';
 import statsRoutes      from './routes/stats';
 import settingsRoutes   from './routes/settings';
 import usersRoutes      from './routes/users';
+import parentRoutes     from './routes/parent';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -54,6 +55,7 @@ app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/stats',       statsRoutes);
 app.use('/api/settings',    settingsRoutes);
 app.use('/api/users',       usersRoutes);
+app.use('/api/parent',      parentRoutes);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
