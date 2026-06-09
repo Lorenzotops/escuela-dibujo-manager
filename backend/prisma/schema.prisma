@@ -17,6 +17,9 @@ model User {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  sentMessages Message[]      @relation("SentMessages")
+  sentReplies  MessageReply[] @relation("SentReplies")
 }
 
 // ─── CONFIGURACIÓN DE LA ESCUELA ─────────────────────────────────────────────
@@ -77,6 +80,7 @@ model Student {
   attendance            Attendance[]
   absenceNotifications  AbsenceNotification[]
   withdrawal            Withdrawal?
+  messages              Message[]
 }
 
 // ─── TUTORES / PADRES ─────────────────────────────────────────────────────────
@@ -190,6 +194,32 @@ model Withdrawal {
   createdAt      DateTime  @default(now())
 
   student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+// ─── MENSAJES PADRES → ESCUELA ────────────────────────────────────────────────
+model Message {
+  id          Int            @id @default(autoincrement())
+  fromUserId  Int
+  studentId   Int?
+  subject     String
+  body        String
+  read        Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+
+  fromUser    User           @relation("SentMessages", fields: [fromUserId], references: [id])
+  student     Student?       @relation(fields: [studentId], references: [id])
+  replies     MessageReply[]
+}
+
+model MessageReply {
+  id          Int      @id @default(autoincrement())
+  messageId   Int
+  fromUserId  Int
+  body        String
+  createdAt   DateTime @default(now())
+
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fromUser    User     @relation("SentReplies", fields: [fromUserId], references: [id])
 }
 
 // ─── TOKENS DE RECUPERACIÓN DE CONTRASEÑA ────────────────────────────────────

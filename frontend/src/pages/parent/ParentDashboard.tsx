@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
@@ -32,6 +32,23 @@ interface AttendanceRecord {
 interface AttendanceSummary {
   summary: { total: number; presente: number; ausente: number; justificado: number };
   records: AttendanceRecord[];
+}
+
+interface MessageReply {
+  id: number;
+  body: string;
+  createdAt: string;
+  fromUser: { name: string; role: string };
+}
+
+interface Message {
+  id: number;
+  subject: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+  student: { fullName: string } | null;
+  replies: MessageReply[];
 }
 
 interface Child {
@@ -98,7 +115,12 @@ export default function ParentDashboard() {
   const [payments,    setPayments]    = useState<Payment[]>([]);
   const [attendance,  setAttendance]  = useState<AttendanceSummary | null>(null);
   const [loading,     setLoading]     = useState(true);
-  const [tab,         setTab]         = useState<'pagos' | 'asistencia'>('pagos');
+  const [tab,         setTab]         = useState<'pagos' | 'asistencia' | 'mensajes'>('pagos');
+  const [messages,    setMessages]    = useState<Message[]>([]);
+  const [msgForm,     setMsgForm]     = useState({ subject: '', body: '' });
+  const [msgSending,  setMsgSending]  = useState(false);
+  const [msgError,    setMsgError]    = useState('');
+  const [msgSuccess,  setMsgSuccess]  = useState(false);
 
   // Cargar hijos al montar
   useEffect(() => {
@@ -119,6 +141,35 @@ export default function ParentDashboard() {
     api.get(`/parent/children/${selected.id}/payments`).then(r => setPayments(r.data));
     api.get(`/parent/children/${selected.id}/attendance`).then(r => setAttendance(r.data));
   }, [selected]);
+
+  // Cargar mensajes al entrar en la pestaña
+  useEffect(() => {
+    if (tab === 'mensajes') {
+      api.get('/messages').then(r => setMessages(r.data));
+      setMsgSuccess(false);
+    }
+  }, [tab]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsgError('');
+    setMsgSending(true);
+    try {
+      await api.post('/messages', {
+        subject: msgForm.subject,
+        body: msgForm.body,
+        studentId: selected?.id,
+      });
+      setMsgForm({ subject: '', body: '' });
+      setMsgSuccess(true);
+      const r = await api.get('/messages');
+      setMessages(r.data);
+    } catch (err: any) {
+      setMsgError(err.response?.data?.error || 'Error al enviar el mensaje');
+    } finally {
+      setMsgSending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -274,20 +325,23 @@ export default function ParentDashboard() {
             display: 'flex', borderBottom: '1px solid #1e1e1e', marginBottom: '16px',
             overflowX: 'auto',
           }}>
-            {(['pagos', 'asistencia'] as const).map(t => (
+            {[
+              { key: 'pagos',      label: '◈ Pagos' },
+              { key: 'asistencia', label: '✓ Asistencia' },
+              { key: 'mensajes',   label: '✉ Mensajes' },
+            ].map(t => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={t.key}
+                onClick={() => setTab(t.key as any)}
                 style={{
-                  padding: '10px 16px', fontSize: '13px', fontWeight: tab === t ? 600 : 400,
-                  color: tab === t ? '#a78bfa' : '#666',
+                  padding: '10px 16px', fontSize: '13px', fontWeight: tab === t.key ? 600 : 400,
+                  color: tab === t.key ? '#a78bfa' : '#666',
                   background: 'transparent', border: 'none', cursor: 'pointer',
-                  borderBottom: tab === t ? '2px solid #7c3aed' : '2px solid transparent',
-                  marginBottom: '-1px', whiteSpace: 'nowrap',
-                  minHeight: '44px',
+                  borderBottom: tab === t.key ? '2px solid #7c3aed' : '2px solid transparent',
+                  marginBottom: '-1px', whiteSpace: 'nowrap', minHeight: '44px',
                 }}
               >
-                {t === 'pagos' ? '◈ Pagos' : '✓ Asistencia'}
+                {t.label}
               </button>
             ))}
           </div>
@@ -355,6 +409,106 @@ export default function ParentDashboard() {
                     </div>
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab Mensajes ── */}
+          {tab === 'mensajes' && (
+            <div>
+              {/* Formulario nuevo mensaje */}
+              <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#e0e0e0', marginBottom: '14px' }}>
+                  ✉ Nuevo mensaje
+                </h3>
+                {msgSuccess && (
+                  <div style={{
+                    background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)',
+                    borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#4ade80',
+                    marginBottom: '14px',
+                  }}>
+                    ✓ Mensaje enviado correctamente. La escuela te responderá en breve.
+                  </div>
+                )}
+                <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label className="label">Asunto</label>
+                    <input
+                      className="input" type="text"
+                      placeholder="Ej: Consulta sobre asistencia"
+                      value={msgForm.subject}
+                      onChange={e => setMsgForm(f => ({ ...f, subject: e.target.value }))}
+                      required style={{ marginTop: '4px' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Mensaje</label>
+                    <textarea
+                      className="input"
+                      placeholder="Escribe tu mensaje aquí…"
+                      value={msgForm.body}
+                      onChange={e => setMsgForm(f => ({ ...f, body: e.target.value }))}
+                      required rows={4}
+                      style={{ marginTop: '4px', resize: 'vertical', minHeight: '100px' }}
+                    />
+                  </div>
+                  {msgError && (
+                    <p style={{ color: '#f87171', fontSize: '13px' }}>{msgError}</p>
+                  )}
+                  <button
+                    type="submit" className="btn-primary"
+                    disabled={msgSending} style={{ minHeight: '44px', alignSelf: 'flex-start', padding: '0 20px' }}
+                  >
+                    {msgSending ? 'Enviando…' : 'Enviar mensaje'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Lista de mensajes enviados */}
+              {messages.length > 0 && (
+                <div>
+                  <p className="label" style={{ marginBottom: '8px' }}>Mensajes enviados</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {messages.map(m => (
+                      <div key={m.id} className="card" style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                          <p style={{ fontWeight: 600, fontSize: '14px', color: '#e0e0e0' }}>{m.subject}</p>
+                          <span style={{
+                            fontSize: '11px', padding: '2px 8px', borderRadius: '6px', flexShrink: 0,
+                            background: m.replies.length > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(136,136,136,0.1)',
+                            color: m.replies.length > 0 ? '#4ade80' : '#666',
+                          }}>
+                            {m.replies.length > 0 ? '✓ Respondido' : 'Pendiente'}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>{m.body}</p>
+                        <p style={{ fontSize: '11px', color: '#444' }}>
+                          {new Date(m.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+
+                        {/* Respuestas */}
+                        {m.replies.length > 0 && (
+                          <div style={{ marginTop: '12px', borderTop: '1px solid #1e1e1e', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {m.replies.map(r => (
+                              <div key={r.id} style={{
+                                background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
+                                borderRadius: '8px', padding: '10px 12px',
+                              }}>
+                                <p style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, marginBottom: '4px' }}>
+                                  {r.fromUser.name} · {r.fromUser.role === 'admin' ? 'Administración' : 'Profesor/a'}
+                                </p>
+                                <p style={{ fontSize: '13px', color: '#d0d0d0' }}>{r.body}</p>
+                                <p style={{ fontSize: '11px', color: '#444', marginTop: '4px' }}>
+                                  {new Date(r.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

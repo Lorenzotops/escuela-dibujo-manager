@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 // Páginas
 import Login            from './pages/Login';
 import RegisterParent   from './pages/auth/RegisterParent';
+import MessagesList     from './pages/messages/MessagesList';
 import ForgotPassword   from './pages/auth/ForgotPassword';
 import ResetPassword    from './pages/auth/ResetPassword';
 import ParentDashboard  from './pages/parent/ParentDashboard';
@@ -108,6 +109,7 @@ function AppRoutes() {
         <Route path="grupos/:id/editar"  element={<AdminRoute><GroupForm /></AdminRoute>} />
 
         {/* Resto — solo admin */}
+        <Route path="mensajes"           element={<MessagesList />} />
         <Route path="bajas"              element={<AdminRoute><WithdrawalsList /></AdminRoute>} />
         <Route path="estadisticas"       element={<AdminRoute><Stats /></AdminRoute>} />
         <Route path="configuracion"      element={<AdminRoute><Settings /></AdminRoute>} />

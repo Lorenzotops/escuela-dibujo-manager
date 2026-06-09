@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/client';
 
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ const adminSections = [
       { to: '/asistencia',   label: 'Asistencia',     icon: '✓' },
       { to: '/pagos',        label: 'Pagos',          icon: '◈' },
       { to: '/facturas',     label: 'Facturación',    icon: '◻' },
+      { to: '/mensajes',     label: 'Mensajes',       icon: '✉' },
     ],
   },
   {
@@ -50,6 +52,7 @@ const profesorSections = [
       { to: '/asistencia',    label: 'Asistencia',     icon: '✓' },
       { to: '/alumnos/nuevo', label: 'Nuevo alumno',   icon: '🎓' },
       { to: '/pagos/nuevo',   label: 'Registrar pago', icon: '◈' },
+      { to: '/mensajes',      label: 'Mensajes',       icon: '✉' },
     ],
   },
 ];
@@ -67,6 +70,21 @@ const padreSections = [
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user, logout, isAdmin, isPadre } = useAuth();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isPadre && user) {
+      api.get('/messages/unread-count')
+        .then(r => setUnreadCount(r.data.count))
+        .catch(() => {});
+      const interval = setInterval(() => {
+        api.get('/messages/unread-count')
+          .then(r => setUnreadCount(r.data.count))
+          .catch(() => {});
+      }, 30000); // refresca cada 30 segundos
+      return () => clearInterval(interval);
+    }
+  }, [user, isPadre]);
 
   const handleLogout = () => {
     logout();
@@ -117,6 +135,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           {item.icon}
         </span>
         {item.label}
+        {item.to === '/mensajes' && unreadCount > 0 && (
+          <span style={{
+            marginLeft: 'auto', background: '#7c3aed', color: '#fff',
+            fontSize: '10px', fontWeight: 700, padding: '1px 6px',
+            borderRadius: '99px', lineHeight: '16px',
+          }}>
+            {unreadCount}
+          </span>
+        )}
       </NavLink>
     </li>
   );
