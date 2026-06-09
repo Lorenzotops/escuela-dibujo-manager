@@ -1,6 +1,6 @@
 # PROMPT DE CONTEXTO — Escuela Lorenzo Manager
 # Pega este texto completo al inicio de un nuevo chat para retomar el proyecto
-# Actualizado el 8 de junio de 2026 — Versión 2.2
+# Actualizado el 9 de junio de 2026 — Versión 2.3
 
 ---
 
@@ -56,6 +56,7 @@ Subcarpetas principales:
 | Base de datos LOCAL | SQLite (archivo local) | — |
 | Base de datos PRODUCCIÓN | PostgreSQL (Railway) | — |
 | Auth | JWT + bcrypt | — |
+| Email | Resend | 3.2 |
 | PDF | jsPDF + jspdf-autotable | 2.5 |
 | HTTP Client | Axios | 1.6 |
 | Tipos | TypeScript | 5.4 |
@@ -80,6 +81,8 @@ Subcarpetas principales:
   - `JWT_SECRET` = generado automáticamente
   - `FRONTEND_URL` = https://escuela-dibujo-manager.vercel.app
   - `DATABASE_PROVIDER` = postgresql (puede borrarse, ya no se usa)
+  - `RESEND_API_KEY` = re_... (API key de Resend para emails)
+  - `RESEND_FROM` = onboarding@resend.dev (cambiar a dominio propio cuando se verifique)
 - **Deploy:** automático desde GitHub en cada push a `main`
 - **Start command:** `npx prisma db push --accept-data-loss && node dist/index.js`
 - **Build command:** `npm install && npm run build`
@@ -113,7 +116,7 @@ escuela-dibujo-manager/
 ├── backend/
 │   ├── .env                              ← DATABASE_URL, JWT_SECRET, PORT=3001
 │   ├── .env.example
-│   ├── package.json
+│   ├── package.json                      ← incluye "resend": "^3.2.0"
 │   ├── tsconfig.json
 │   ├── tsconfig.seed.json
 │   ├── railway.json                      ← configuración deploy Railway
@@ -125,8 +128,10 @@ escuela-dibujo-manager/
 │       ├── middleware/
 │       │   ├── auth.ts
 │       │   └── roles.ts
+│       ├── services/
+│       │   └── email.ts                  ← sendWelcomeParent, sendPasswordReset, sendPaymentReminder
 │       └── routes/
-│           ├── auth.ts
+│           ├── auth.ts                   ← login, me, register-parent, forgot-password, reset-password
 │           ├── students.ts
 │           ├── guardians.ts
 │           ├── groups.ts
@@ -136,7 +141,8 @@ escuela-dibujo-manager/
 │           ├── withdrawals.ts
 │           ├── stats.ts
 │           ├── settings.ts
-│           └── users.ts
+│           ├── users.ts
+│           └── parent.ts                 ← rutas exclusivas para rol 'padre'
 │
 └── frontend/
     ├── index.html                        ← tiene Inter font de Google Fonts
@@ -146,18 +152,24 @@ escuela-dibujo-manager/
     ├── package.json                      ← build: "vite build" (sin tsc)
     └── src/
         ├── main.tsx
-        ├── App.tsx                       ← rutas + PrivateRoute + AdminRoute + AdminOrProfesorRoute
+        ├── App.tsx                       ← rutas + PrivateRoute + AdminRoute + AdminOrProfesorRoute + PadreRoute
         ├── index.css                     ← DARK MODE COMPLETO con CSS variables
         ├── api/
         │   └── client.ts
         ├── context/
-        │   └── AuthContext.tsx
+        │   └── AuthContext.tsx           ← roles: admin | profesor | padre — expone isPadre
         ├── components/
         │   ├── Layout.tsx                ← fondo #0a0a0a, header móvil "Escuela Lorenzo"
-        │   └── Sidebar.tsx               ← dark sidebar, logo /logo.jpg, menú por rol
+        │   └── Sidebar.tsx               ← dark sidebar, logo /logo.jpg, menú por rol (admin/profesor/padre)
         ├── pages/
-        │   ├── Login.tsx
+        │   ├── Login.tsx                 ← enlace a /forgot-password y /registro-padre
         │   ├── Dashboard.tsx
+        │   ├── auth/
+        │   │   ├── RegisterParent.tsx    ← registro público para padres (verifica email en Guardian)
+        │   │   ├── ForgotPassword.tsx    ← solicitud de reseteo de contraseña
+        │   │   └── ResetPassword.tsx     ← formulario de nueva contraseña (token por URL)
+        │   ├── parent/
+        │   │   └── ParentDashboard.tsx   ← panel del padre: selector de hijo, pagos, asistencia
         │   ├── students/
         │   │   ├── StudentsList.tsx      ← columna "Pago mes" (sin columna Colegio)
         │   │   ├── StudentForm.tsx
@@ -199,18 +211,19 @@ escuela-dibujo-manager/
 
 ## MODELO DE BASE DE DATOS (Prisma — PostgreSQL en producción)
 ```
-User            → id, name, email, password, role(admin|profesor), active
-Settings        → schoolName, address, phone, email, cifNif, monthlyFee, invoicePrefix, invoiceCounter, logoUrl, invoiceFooter
-Group           → name, dayOfWeek, startTime, endTime, teacher, maxCapacity, notes, active
-Student         → fullName, birthDate, dni, address, school, howFoundUs, referredBy, enrollmentReason, enrollmentDate, status(activo|baja|pausa), currentGroupId, notes
-Guardian        → studentId(FK), fullName, dni, phone, email, address, relationship, notes, isPrimary
-StudentGroup    → studentId(FK), groupId(FK), assignedAt, leftAt, isCurrent
-Payment         → studentId(FK), month, year, amount, paidAt, method, status(pagado|pendiente|atrasado), notes
-Invoice         → invoiceNumber(unique), studentId(FK), paymentId(FK?), concept, billedMonth, billedYear, amount, issueDate, status(emitida|pagada|anulada), guardianName, guardianDni, notes
-Attendance      → studentId(FK), groupId(FK), date, status(presente|ausente|justificado), notes — unique(studentId, date)
+User                → id, name, email, password, role(admin|profesor|padre), active
+Settings            → schoolName, address, phone, email, cifNif, monthlyFee, invoicePrefix, invoiceCounter, logoUrl, invoiceFooter
+Group               → name, dayOfWeek, startTime, endTime, teacher, maxCapacity, notes, active
+Student             → fullName, birthDate, dni, address, school, howFoundUs, referredBy, enrollmentReason, enrollmentDate, status(activo|baja|pausa), currentGroupId, notes
+Guardian            → studentId(FK), fullName, dni, phone, email, address, relationship, notes, isPrimary
+StudentGroup        → studentId(FK), groupId(FK), assignedAt, leftAt, isCurrent
+Payment             → studentId(FK), month, year, amount, paidAt, method, status(pagado|pendiente|atrasado), notes
+Invoice             → invoiceNumber(unique), studentId(FK), paymentId(FK?), concept, billedMonth, billedYear, amount, issueDate, status(emitida|pagada|anulada), guardianName, guardianDni, notes
+Attendance          → studentId(FK), groupId(FK), date, status(presente|ausente|justificado), notes — unique(studentId, date)
 AbsenceNotification → studentId(FK), date, reason
-Withdrawal      → studentId(FK unique), withdrawalDate, reason, notes, contactLater, reactivatedAt
-MessageTemplate → name, category, body, active
+Withdrawal          → studentId(FK unique), withdrawalDate, reason, notes, contactLater, reactivatedAt
+MessageTemplate     → name, category, body, active
+PasswordResetToken  → email, token(unique), expiresAt, used — tokens de reseteo (TTL 1h)
 ```
 
 ---
@@ -219,6 +232,9 @@ MessageTemplate → name, category, body, active
 ```
 POST   /api/auth/login
 GET    /api/auth/me
+POST   /api/auth/register-parent     ← registro de padre (verifica email en Guardian, envía email bienvenida)
+POST   /api/auth/forgot-password     ← genera token y envía email de reseteo
+POST   /api/auth/reset-password      ← valida token y actualiza contraseña
 GET    /api/students          ?search=&status=&groupId=
 POST   /api/students
 GET    /api/students/:id
@@ -232,13 +248,13 @@ GET    /api/groups
 POST   /api/groups
 GET    /api/groups/:id
 PUT    /api/groups/:id
-POST   /api/groups/:id/assign  ← asigna alumno al grupo (body: { studentId })
+POST   /api/groups/:id/assign        ← asigna alumno al grupo (body: { studentId })
 GET    /api/payments           ?month=&year=&status=&groupId=
 GET    /api/payments/pending
 GET    /api/payments/student/:studentId
 POST   /api/payments
 PUT    /api/payments/:id
-POST   /api/payments/generate-monthly  ← genera cuotas para todos los activos (SIN BOTÓN EN UI AÚN)
+POST   /api/payments/generate-monthly
 GET    /api/invoices           ?studentId=&status=&month=&year=
 GET    /api/invoices/:id
 POST   /api/invoices
@@ -259,6 +275,9 @@ GET    /api/users
 POST   /api/users
 PUT    /api/users/:id
 DELETE /api/users/:id
+GET    /api/parent/children                        ← alumnos del padre autenticado (rol: padre)
+GET    /api/parent/children/:studentId/payments    ← pagos del hijo (rol: padre)
+GET    /api/parent/children/:studentId/attendance  ← asistencia últimos 90 días (rol: padre)
 ```
 
 ---
@@ -269,6 +288,7 @@ DELETE /api/users/:id
 | Administrador | admin@arteycolor.es | admin123 |
 | Profesor | ana@arteycolor.es | prof123 |
 | Profesor | carlos@arteycolor.es | prof123 |
+| Padre | se registran solos en /registro-padre | la que elijan |
 
 ---
 
@@ -282,6 +302,14 @@ DELETE /api/users/:id
 
 Las rutas bloqueadas para profesores redirigen a `/asistencia`.
 Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
+
+### PADRE — acceso exclusivo a:
+1. **Panel familiar** (`/panel-padre`) — datos del hijo, pagos, asistencia últimos 90 días
+2. Si tiene varios hijos, selector para cambiar entre ellos
+3. No puede ver ninguna ruta del área de gestión (redirige a `/panel-padre`)
+
+El acceso de padre se vincula por **email**: el email del User debe coincidir con el email de un Guardian en la BD.
+El registro de padres es público en `/registro-padre` pero solo funciona si el email ya está en la tabla Guardian.
 
 ---
 
@@ -310,10 +338,10 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 
 ---
 
-## FUNCIONALIDADES IMPLEMENTADAS (v2.1)
+## FUNCIONALIDADES IMPLEMENTADAS (v2.3)
 
 ### Lo que YA funciona:
-- ✅ Login con roles (admin / profesor)
+- ✅ Login con roles (admin / profesor / padre)
 - ✅ Dashboard con alertas de pagos atrasados
 - ✅ CRUD completo de alumnos con ficha de 6 pestañas
 - ✅ Tutores/padres con botón directo a WhatsApp
@@ -343,6 +371,12 @@ Implementado en `App.tsx` con el componente `AdminOrProfesorRoute`.
 - ✅ **v2.2** PaymentsList: botones admin se apilan en móvil (flex-wrap)
 - ✅ **v2.2** Tabs de asistencia: scroll horizontal en pantallas muy pequeñas, whiteSpace nowrap
 - ✅ **v2.2** Dashboard: fecha oculta en móvil para no chocar con el título
+- ✅ **v2.3** Portal de familias: rol 'padre', registro en /registro-padre, panel /panel-padre
+- ✅ **v2.3** Panel padre: selector de hijo (multi-hijo), datos del grupo, estado de pagos, historial asistencia 90 días
+- ✅ **v2.3** Email bienvenida al registrarse padre (Resend)
+- ✅ **v2.3** Recuperación de contraseña: forgot-password + reset-password con token seguro (TTL 1h)
+- ✅ **v2.3** Enlace "¿Olvidaste tu contraseña?" en Login
+- ✅ **v2.3** Enlace "¿Eres padre? Crea tu cuenta" en Login
 
 ---
 
@@ -353,10 +387,13 @@ Precio objetivo: 39-59 €/mes por academia.
 ### FASE 1 — Pulir el producto (EN CURSO)
 Objetivo: que la app esté impecable con Escuela Lorenzo como cliente real.
 - ✅ Mejoras móvil (v2.2)
-- ❌ **Email básico** — integrar Resend o SendGrid: recordatorio de pago a padres + recuperación de contraseña
+- ✅ **Email básico** — Resend integrado: bienvenida a padres + recuperación de contraseña (v2.3)
+- ✅ **Portal de familias** — padres pueden ver datos del hijo, pagos y asistencia (v2.3)
+- ❌ **Email recordatorio de pago** — función `sendPaymentReminder` ya existe en email.ts, falta botón en UI
 - ❌ **Exportación a Excel** — lista de alumnos y pagos en .xlsx
 - ❌ Búsqueda en tiempo real de alumnos (ahora requiere pulsar Enter)
 - ❌ Filtro por grupo en lista de pagos (backend listo con `?groupId=`, falta UI)
+- ❌ **Galería de trabajos (Fase B portal padres)** — Cloudinary + subida por profesor + galería en panel padre
 
 ### FASE 2 — Multi-tenancy (CRÍTICO para vender)
 Cada academia tiene sus datos completamente aislados. Es el cambio arquitectural más grande.
@@ -377,10 +414,12 @@ Cada academia tiene sus datos completamente aislados. Es el cambio arquitectural
 ---
 
 ## FUNCIONES PENDIENTES / BACKLOG TÉCNICO
-- ❌ Email: recordatorio de pago + recuperación de contraseña (Fase 1)
+- ❌ Email recordatorio de pago a padres — `sendPaymentReminder` ya implementada en email.ts, falta botón en UI
 - ❌ Exportación a Excel (Fase 1)
 - ❌ Búsqueda en tiempo real de alumnos (Fase 1)
 - ❌ Filtro por grupo en lista de pagos — UI (backend ya listo)
+- ❌ Galería de trabajos en portal de padres (Cloudinary)
+- ❌ Verificar dominio propio en Resend y cambiar RESEND_FROM (ahora usa onboarding@resend.dev)
 - ❌ Lista de espera para grupos llenos
 - ❌ Notificaciones de ausencia — botón en UI (endpoint ya existe)
 - ❌ WhatsApp Business API real (ahora solo abre wa.me)
@@ -407,6 +446,7 @@ Cada academia tiene sus datos completamente aislados. Es el cambio arquitectural
 ## DATOS DE PRUEBA (seed aplicado en producción)
 - **Admin:** admin@arteycolor.es / admin123
 - **Profesores:** ana@arteycolor.es / prof123 | carlos@arteycolor.es / prof123
+- **Padres:** se registran solos en /registro-padre (el email debe existir en tabla Guardian)
 - **12 alumnos** (10 activos, 1 en pausa, 1 de baja)
 - **3 grupos:** Grupo Mañana (L/X 10-12, Ana), Grupo Tarde A (M/J 17-19, Carlos), Grupo Tarde B (V 16:30-18:30, Ana)
 - **Pagos** de marzo a junio 2026
@@ -444,17 +484,37 @@ npx prisma db seed
 
 ---
 
-## ENDPOINTS AÑADIDOS EN v2.1 / v2.2
+## ENDPOINTS AÑADIDOS EN v2.1 / v2.2 / v2.3
 ```
-POST   /api/payments/generate-monthly  ← ✅ YA TIENE BOTÓN en PaymentsList (admin only)
-POST   /api/invoices/sync-paid         ← sincroniza facturas emitidas con pagos cobrados (uso puntual)
-POST   /api/settings/logo              ← ahora acepta JSON { logoBase64 } en lugar de multipart
+POST   /api/payments/generate-monthly       ← ✅ YA TIENE BOTÓN en PaymentsList (admin only)
+POST   /api/invoices/sync-paid              ← sincroniza facturas emitidas con pagos cobrados (uso puntual)
+POST   /api/settings/logo                   ← acepta JSON { logoBase64 } en lugar de multipart
+POST   /api/auth/register-parent            ← registro de padre (verifica Guardian, envía email)
+POST   /api/auth/forgot-password            ← genera token reseteo + envía email
+POST   /api/auth/reset-password             ← valida token y cambia contraseña
+GET    /api/parent/children                 ← hijos del padre autenticado
+GET    /api/parent/children/:id/payments    ← pagos del hijo
+GET    /api/parent/children/:id/attendance  ← asistencia últimos 90 días
 ```
+
+---
+
+## SERVICIO DE EMAIL (backend/src/services/email.ts)
+Usa Resend. Tres funciones disponibles:
+- `sendWelcomeParent(to, name, childName)` — bienvenida al registrarse padre ✅ en uso
+- `sendPasswordReset(to, name, token)` — enlace de reseteo de contraseña ✅ en uso
+- `sendPaymentReminder(to, parentName, childName, month, amount)` — recordatorio cuota ❌ falta botón en UI
+
+Variables de entorno necesarias: `RESEND_API_KEY`, `RESEND_FROM`
+Actualmente usando `onboarding@resend.dev` como FROM (dominio de Resend).
+Pendiente: verificar dominio propio en Resend y actualizar `RESEND_FROM` en Railway.
 
 ---
 
 ## HISTORIAL DE COMMITS
 ```
+feat: email bienvenida padres + recuperacion contrasena con Resend   ← sesión 9/6/2026
+feat: portal de padres - registro, panel con hijo/pagos/asistencia   ← sesión 9/6/2026
 feat: mejoras móvil - padding, logo header, botones táctiles, tabs asistencia  ← sesión 8/6/2026
 feat: factura auto al cobrar + fix estado emitida→pagada + sync endpoint        ← sesión 6/6/2026
 feat: generar cuotas mensuales UI + logo persistente base64 en BD               ← sesión 6/6/2026
@@ -475,6 +535,6 @@ Al iniciar una nueva sesión, lee este archivo para entender el estado actual.
 Al terminar, actualiza: FUNCIONALIDADES IMPLEMENTADAS, FUNCIONES PENDIENTES, BUGS CORREGIDOS e HISTORIAL DE COMMITS.
 
 ---
-*Actualizado el 8 de junio de 2026 — Versión 2.2 en producción*
+*Actualizado el 9 de junio de 2026 — Versión 2.3 en producción*
 *Frontend: https://escuela-dibujo-manager.vercel.app*
 *Backend: https://escuela-dibujo-manager-production.up.railway.app*

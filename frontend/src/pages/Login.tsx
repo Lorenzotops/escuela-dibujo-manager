@@ -15,8 +15,8 @@ export default function Login() {
     if (!email || !password) { toast.error('Rellena todos los campos'); return; }
     setLoading(true);
     try {
-      await login(email, password);
-      navigate('/');
+      const loggedUser = await login(email, password);
+      navigate(loggedUser.role === 'padre' ? '/panel-padre' : '/');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Error al iniciar sesión');
     } finally {
