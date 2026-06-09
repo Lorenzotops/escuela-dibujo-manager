@@ -192,6 +192,16 @@ model Withdrawal {
   student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
+// ─── TOKENS DE RECUPERACIÓN DE CONTRASEÑA ────────────────────────────────────
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 // ─── PLANTILLAS DE MENSAJES ───────────────────────────────────────────────────
 model MessageTemplate {
   id        Int      @id @default(autoincrement())

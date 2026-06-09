@@ -59,6 +59,11 @@ export default function Login() {
                 autoComplete="current-password"
               />
             </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Link to="/forgot-password" style={{ fontSize: '12px', color: '#666', textDecoration: 'none' }}>
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             <button type="submit" className="btn-primary w-full py-3 text-base mt-2" disabled={loading}>
               {loading ? 'Accediendo...' : 'Entrar'}
             </button>

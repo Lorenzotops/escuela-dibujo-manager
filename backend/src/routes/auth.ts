@@ -2,7 +2,9 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { sendWelcomeParent, sendPasswordReset } from '../services/email';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -66,7 +68,10 @@ router.post('/register-parent', async (req: Request, res: Response) => {
     }
 
     // Verificar que el email existe como tutor en el sistema
-    const guardian = await prisma.guardian.findFirst({ where: { email } });
+    const guardian = await prisma.guardian.findFirst({
+      where: { email },
+      include: { student: { select: { fullName: true } } },
+    });
     if (!guardian) {
       return res.status(403).json({
         error: 'Tu email no está registrado en la escuela. Contacta con la administración.',
@@ -90,10 +95,80 @@ router.post('/register-parent', async (req: Request, res: Response) => {
       { expiresIn: '8h' }
     );
 
+    // Email de bienvenida (no bloqueante — si falla el email la cuenta igual se crea)
+    sendWelcomeParent(email, name, guardian.student.fullName).catch(e =>
+      console.error('Error enviando email de bienvenida:', e.message)
+    );
+
     res.status(201).json({
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/forgot-password
+// Genera un token de reseteo y envía el email
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requerido' });
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Siempre responder con éxito para no revelar si el email existe
+    if (!user || !user.active) {
+      return res.json({ message: 'Si el email existe, recibirás un enlace en breve.' });
+    }
+
+    // Invalidar tokens anteriores del mismo email
+    await prisma.passwordResetToken.updateMany({
+      where: { email, used: false },
+      data: { used: true },
+    });
+
+    // Crear nuevo token (expira en 1 hora)
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
+
+    // Enviar email
+    await sendPasswordReset(email, user.name, token);
+
+    res.json({ message: 'Si el email existe, recibirás un enlace en breve.' });
+  } catch (err: any) {
+    console.error('Error en forgot-password:', err.message);
+    // No exponer detalles del error
+    res.json({ message: 'Si el email existe, recibirás un enlace en breve.' });
+  }
+});
+
+// POST /api/auth/reset-password
+// Valida el token y actualiza la contraseña
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token y contraseña requeridos' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const resetToken = await prisma.passwordResetToken.findUnique({ where: { token } });
+
+    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'El enlace no es válido o ha caducado.' });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.user.update({ where: { email: resetToken.email }, data: { password: hashed } });
+    await prisma.passwordResetToken.update({ where: { token }, data: { used: true } });
+
+    res.json({ message: 'Contraseña actualizada correctamente.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 // Páginas
 import Login            from './pages/Login';
 import RegisterParent   from './pages/auth/RegisterParent';
+import ForgotPassword   from './pages/auth/ForgotPassword';
+import ResetPassword    from './pages/auth/ResetPassword';
 import ParentDashboard  from './pages/parent/ParentDashboard';
 import Dashboard        from './pages/Dashboard';
 import StudentsList     from './pages/students/StudentsList';
@@ -67,8 +69,10 @@ const PadreRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/registro-padre" element={<RegisterParent />} />
+      <Route path="/login"           element={<Login />} />
+      <Route path="/registro-padre"  element={<RegisterParent />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password"  element={<ResetPassword />} />
 
       {/* Panel exclusivo para padres — usa el Layout pero con menú propio */}
       <Route path="/panel-padre" element={<PadreRoute><Layout /></PadreRoute>}>
