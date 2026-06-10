@@ -1,6 +1,6 @@
 # PROMPT DE CONTEXTO — Escuela Lorenzo Manager
 # Pega este texto completo al inicio de un nuevo chat para retomar el proyecto
-# Actualizado el 9 de junio de 2026 — Versión 2.3
+# Actualizado el 10 de junio de 2026 — Versión 2.4
 
 ---
 
@@ -57,6 +57,7 @@ Subcarpetas principales:
 | Base de datos PRODUCCIÓN | PostgreSQL (Railway) | — |
 | Auth | JWT + bcrypt | — |
 | Email | Resend | 3.2 |
+| Mensajería | BD + polling 30s | — |
 | PDF | jsPDF + jspdf-autotable | 2.5 |
 | HTTP Client | Axios | 1.6 |
 | Tipos | TypeScript | 5.4 |
@@ -142,7 +143,8 @@ escuela-dibujo-manager/
 │           ├── stats.ts
 │           ├── settings.ts
 │           ├── users.ts
-│           └── parent.ts                 ← rutas exclusivas para rol 'padre'
+│           ├── parent.ts                 ← rutas exclusivas para rol 'padre'
+│           └── messages.ts               ← sistema de mensajes padres ↔ escuela
 │
 └── frontend/
     ├── index.html                        ← tiene Inter font de Google Fonts
@@ -169,7 +171,9 @@ escuela-dibujo-manager/
         │   │   ├── ForgotPassword.tsx    ← solicitud de reseteo de contraseña
         │   │   └── ResetPassword.tsx     ← formulario de nueva contraseña (token por URL)
         │   ├── parent/
-        │   │   └── ParentDashboard.tsx   ← panel del padre: selector de hijo, pagos, asistencia
+        │   │   └── ParentDashboard.tsx   ← panel del padre: selector de hijo, pagos, asistencia, mensajes
+        │   ├── messages/
+        │   │   └── MessagesList.tsx      ← bandeja de entrada admin/profesor: hilo, respuesta inline
         │   ├── students/
         │   │   ├── StudentsList.tsx      ← columna "Pago mes" (sin columna Colegio)
         │   │   ├── StudentForm.tsx
@@ -224,6 +228,8 @@ AbsenceNotification → studentId(FK), date, reason
 Withdrawal          → studentId(FK unique), withdrawalDate, reason, notes, contactLater, reactivatedAt
 MessageTemplate     → name, category, body, active
 PasswordResetToken  → email, token(unique), expiresAt, used — tokens de reseteo (TTL 1h)
+Message             → fromUserId(FK User), studentId(FK? Student), subject, body, read, createdAt
+MessageReply        → messageId(FK Message), fromUserId(FK User), body, createdAt
 ```
 
 ---
@@ -278,6 +284,12 @@ DELETE /api/users/:id
 GET    /api/parent/children                        ← alumnos del padre autenticado (rol: padre)
 GET    /api/parent/children/:studentId/payments    ← pagos del hijo (rol: padre)
 GET    /api/parent/children/:studentId/attendance  ← asistencia últimos 90 días (rol: padre)
+POST   /api/messages                               ← padre envía mensaje (con studentId opcional)
+GET    /api/messages                               ← admin/profesor: todos | padre: los suyos
+GET    /api/messages/unread-count                  ← número de mensajes no leídos (admin/profesor)
+GET    /api/messages/:id                           ← detalle + marca leído automáticamente
+POST   /api/messages/:id/reply                     ← admin/profesor responde
+PATCH  /api/messages/:id/read                      ← marcar como leído
 ```
 
 ---
@@ -377,6 +389,11 @@ El registro de padres es público en `/registro-padre` pero solo funciona si el 
 - ✅ **v2.3** Recuperación de contraseña: forgot-password + reset-password con token seguro (TTL 1h)
 - ✅ **v2.3** Enlace "¿Olvidaste tu contraseña?" en Login
 - ✅ **v2.3** Enlace "¿Eres padre? Crea tu cuenta" en Login
+- ✅ **v2.3** Fix race condition login: navigate basado en rol devuelto por login(), no en estado de React
+- ✅ **v2.4** Sistema de mensajes padres ↔ escuela: buzón asíncrono con hilos y respuestas
+- ✅ **v2.4** Tab "✉ Mensajes" en panel del padre: formulario + historial de mensajes + respuestas recibidas
+- ✅ **v2.4** Bandeja de entrada /mensajes para admin y profesores: lista, detalle, respuesta inline
+- ✅ **v2.4** Badge de mensajes no leídos en sidebar (polling cada 30s), visible para admin y profesores
 
 ---
 
@@ -388,7 +405,8 @@ Precio objetivo: 39-59 €/mes por academia.
 Objetivo: que la app esté impecable con Escuela Lorenzo como cliente real.
 - ✅ Mejoras móvil (v2.2)
 - ✅ **Email básico** — Resend integrado: bienvenida a padres + recuperación de contraseña (v2.3)
-- ✅ **Portal de familias** — padres pueden ver datos del hijo, pagos y asistencia (v2.3)
+- ✅ **Portal de familias** — padres pueden ver datos del hijo, pagos, asistencia y mensajes (v2.3/v2.4)
+- ✅ **Mensajería** — buzón asíncrono padres ↔ escuela con respuestas (v2.4)
 - ❌ **Email recordatorio de pago** — función `sendPaymentReminder` ya existe en email.ts, falta botón en UI
 - ❌ **Exportación a Excel** — lista de alumnos y pagos en .xlsx
 - ❌ Búsqueda en tiempo real de alumnos (ahora requiere pulsar Enter)
@@ -418,8 +436,9 @@ Cada academia tiene sus datos completamente aislados. Es el cambio arquitectural
 - ❌ Exportación a Excel (Fase 1)
 - ❌ Búsqueda en tiempo real de alumnos (Fase 1)
 - ❌ Filtro por grupo en lista de pagos — UI (backend ya listo)
-- ❌ Galería de trabajos en portal de padres (Cloudinary)
+- ❌ Galería de trabajos en portal de padres (Cloudinary) — Fase B portal padres
 - ❌ Verificar dominio propio en Resend y cambiar RESEND_FROM (ahora usa onboarding@resend.dev)
+- ❌ Email al padre cuando el admin responde un mensaje (notificación de respuesta)
 - ❌ Lista de espera para grupos llenos
 - ❌ Notificaciones de ausencia — botón en UI (endpoint ya existe)
 - ❌ WhatsApp Business API real (ahora solo abre wa.me)
@@ -495,6 +514,12 @@ POST   /api/auth/reset-password             ← valida token y cambia contraseñ
 GET    /api/parent/children                 ← hijos del padre autenticado
 GET    /api/parent/children/:id/payments    ← pagos del hijo
 GET    /api/parent/children/:id/attendance  ← asistencia últimos 90 días
+POST   /api/messages                        ← padre envía mensaje
+GET    /api/messages                        ← todos (admin/prof) o los propios (padre)
+GET    /api/messages/unread-count           ← no leídos para admin/profesor
+GET    /api/messages/:id                    ← detalle, marca leído
+POST   /api/messages/:id/reply              ← admin/profesor responde
+PATCH  /api/messages/:id/read              ← marcar leído manualmente
 ```
 
 ---
@@ -513,8 +538,10 @@ Pendiente: verificar dominio propio en Resend y actualizar `RESEND_FROM` en Rail
 
 ## HISTORIAL DE COMMITS
 ```
-feat: email bienvenida padres + recuperacion contrasena con Resend   ← sesión 9/6/2026
-feat: portal de padres - registro, panel con hijo/pagos/asistencia   ← sesión 9/6/2026
+feat: sistema de mensajes padres-escuela con bandeja de entrada y respuestas  ← sesión 10/6/2026
+fix: login redirige a /panel-padre para rol padre                              ← sesión 10/6/2026
+feat: email bienvenida padres + recuperacion contrasena con Resend             ← sesión 9/6/2026
+feat: portal de padres - registro, panel con hijo/pagos/asistencia             ← sesión 9/6/2026
 feat: mejoras móvil - padding, logo header, botones táctiles, tabs asistencia  ← sesión 8/6/2026
 feat: factura auto al cobrar + fix estado emitida→pagada + sync endpoint        ← sesión 6/6/2026
 feat: generar cuotas mensuales UI + logo persistente base64 en BD               ← sesión 6/6/2026
@@ -535,6 +562,6 @@ Al iniciar una nueva sesión, lee este archivo para entender el estado actual.
 Al terminar, actualiza: FUNCIONALIDADES IMPLEMENTADAS, FUNCIONES PENDIENTES, BUGS CORREGIDOS e HISTORIAL DE COMMITS.
 
 ---
-*Actualizado el 9 de junio de 2026 — Versión 2.3 en producción*
+*Actualizado el 10 de junio de 2026 — Versión 2.4 en producción*
 *Frontend: https://escuela-dibujo-manager.vercel.app*
 *Backend: https://escuela-dibujo-manager-production.up.railway.app*

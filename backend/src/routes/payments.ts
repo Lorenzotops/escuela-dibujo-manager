@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { requireAdmin } from '../middleware/roles';
+import { sendPaymentReminder } from '../services/email';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -252,6 +253,78 @@ router.post('/generate-monthly', requireAdmin, async (req: AuthRequest, res: Res
     }
 
     res.json({ message: `${created} cuotas generadas para ${month}/${year}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// POST /api/payments/reminder/:studentId — Recordatorio consolidado (todos los meses pendientes)
+router.post('/reminder/:studentId', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const studentId = Number(req.params.studentId);
+
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: {
+        guardians: { where: { isPrimary: true } },
+        payments: {
+          where: { status: { in: ['pendiente', 'atrasado'] } },
+          orderBy: [{ year: 'asc' }, { month: 'asc' }],
+        },
+      },
+    });
+
+    if (!student) return res.status(404).json({ error: 'Alumno no encontrado' });
+
+    const guardian = student.guardians[0];
+    if (!guardian?.email) {
+      return res.status(400).json({ error: 'El tutor principal no tiene email registrado' });
+    }
+
+    if (student.payments.length === 0) {
+      return res.status(400).json({ error: 'No hay cuotas pendientes para este alumno' });
+    }
+
+    const monthNames = student.payments.map(p => `${MONTHS_ES[p.month - 1]} ${p.year}`);
+    const monthStr = monthNames.length === 1
+      ? monthNames[0]
+      : monthNames.slice(0, -1).join(', ') + ' y ' + monthNames[monthNames.length - 1];
+
+    const total = student.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+    await sendPaymentReminder(guardian.email, guardian.fullName, student.fullName, monthStr, total);
+
+    res.json({ message: `Recordatorio enviado a ${guardian.email}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/payments/:id/send-reminder — Recordatorio para un pago concreto
+router.post('/:id/send-reminder', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: { id: Number(req.params.id) },
+      include: {
+        student: {
+          include: { guardians: { where: { isPrimary: true } } },
+        },
+      },
+    });
+
+    if (!payment) return res.status(404).json({ error: 'Pago no encontrado' });
+
+    const guardian = payment.student.guardians[0];
+    if (!guardian?.email) {
+      return res.status(400).json({ error: 'El tutor principal no tiene email registrado' });
+    }
+
+    const monthName = `${MONTHS_ES[payment.month - 1]} ${payment.year}`;
+    await sendPaymentReminder(guardian.email, guardian.fullName, payment.student.fullName, monthName, Number(payment.amount));
+
+    res.json({ message: `Recordatorio enviado a ${guardian.email}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

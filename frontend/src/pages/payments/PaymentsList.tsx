@@ -22,6 +22,7 @@ export default function PaymentsList() {
   const [genMonth,   setGenMonth]   = useState(now.getMonth() + 1);
   const [genYear,    setGenYear]    = useState(now.getFullYear());
   const [generating, setGenerating] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState<number | null>(null);
 
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -52,6 +53,26 @@ export default function PaymentsList() {
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Error al generar cuotas');
     } finally { setGenerating(false); }
+  };
+
+  const sendReminder = async (paymentId: number) => {
+    setSendingEmail(paymentId);
+    try {
+      const res = await api.post(`/payments/${paymentId}/send-reminder`);
+      toast.success(res.data.message);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al enviar el recordatorio');
+    } finally { setSendingEmail(null); }
+  };
+
+  const sendStudentReminder = async (studentId: number) => {
+    setSendingEmail(studentId);
+    try {
+      const res = await api.post(`/payments/reminder/${studentId}`);
+      toast.success(res.data.message);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al enviar el recordatorio');
+    } finally { setSendingEmail(null); }
   };
 
   const markPaid = async (payment: any) => {
@@ -191,9 +212,19 @@ export default function PaymentsList() {
                         {isAdmin && (
                           <td className="px-4 py-3">
                             {p.status !== 'pagado' && (
-                              <button className="btn-success py-1 px-2 text-xs" onClick={() => markPaid(p)}>
-                                ✓ Cobrado
-                              </button>
+                              <div className="flex flex-wrap gap-1">
+                                <button className="btn-success py-1 px-2 text-xs" onClick={() => markPaid(p)}>
+                                  ✓ Cobrado
+                                </button>
+                                <button
+                                  className="btn-secondary py-1 px-2 text-xs"
+                                  onClick={() => sendReminder(p.id)}
+                                  disabled={sendingEmail === p.id}
+                                  title="Enviar recordatorio por email al tutor"
+                                >
+                                  {sendingEmail === p.id ? '...' : '📧'}
+                                </button>
+                              </div>
                             )}
                           </td>
                         )}
@@ -229,10 +260,20 @@ export default function PaymentsList() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {isAdmin && (
                     <button className="btn-primary text-sm" onClick={() => navigate(`/pagos/nuevo?studentId=${s.id}`)}>
                       💰 Cobrar
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      className="btn-secondary text-sm"
+                      onClick={() => sendStudentReminder(s.id)}
+                      disabled={sendingEmail === s.id}
+                      title="Enviar recordatorio por email al tutor"
+                    >
+                      {sendingEmail === s.id ? 'Enviando...' : '📧 Email'}
                     </button>
                   )}
                   {s.guardians?.[0]?.phone && (
