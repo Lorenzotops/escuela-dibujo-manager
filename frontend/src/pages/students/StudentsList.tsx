@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -60,9 +60,10 @@ export default function StudentsList() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [statusFilter]);
-
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchData(); };
+  useEffect(() => {
+    const timer = setTimeout(() => { fetchData(); }, 400);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter]);
 
   const PaymentCell = ({ student }: { student: Student }) => {
     if (student.status === 'baja') return <span className="text-gray-400 text-xs">—</span>;
@@ -93,7 +94,7 @@ export default function StudentsList() {
 
       {/* Filtros */}
       <div className="card">
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             className="input flex-1"
@@ -107,8 +108,7 @@ export default function StudentsList() {
             <option value="pausa">En pausa</option>
             <option value="baja">Baja</option>
           </select>
-          <button type="submit" className="btn-primary whitespace-nowrap">🔍 Buscar</button>
-        </form>
+        </div>
       </div>
 
       {/* Tabla */}
